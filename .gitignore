@@ -1,0 +1,52 @@
+# Entornos virtuales
+.venv/
+**/venv/
+**/env/
+
+# Bytecode y cache de Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Archivos de credenciales y secretos (¡CRÍTICO!)
+.env
+**/.env
+.env.local
+**/.env.local
+.env.*.local
+**/.env.*.local
+google_service_account*.json
+**/google_service_account*.json
+*.pem
+*.key
+
+# Archivos de datos, CSVs y exportaciones
+*.csv
+**/*.csv
+*.xlsx
+**/*.xlsx
+
+# Base de datos SQLite operativa y temporales
+*.db
+**/*.db
+*.db-journal
+**/*.db-journal
+*.sqlite
+**/*.sqlite
+*.sqlite3
+**/*.sqlite3
+
+# Logs
+*.log
+**/*.log
+
+# Editores y sistema operativo
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

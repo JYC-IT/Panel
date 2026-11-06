@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Acceso Ejecutivo · JYC Equipment{% endblock %}
+
+{% block content %}
+<div style="min-height: calc(100vh - 120px); display: flex; align-items: center; justify-content: center; padding: 20px;">
+  <div style="max-width: 440px; width: 100%; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 40px 36px; box-shadow: var(--shadow-lg);">
+    
+    <!-- Encabezado del Login -->
+    <div style="text-align: center; margin-bottom: 28px;">
+      <div style="width: 52px; height: 52px; border-radius: 14px; background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%); display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 20px; box-shadow: 0 10px 20px rgba(79, 70, 229, 0.25); margin-bottom: 16px;">
+        JYC
+      </div>
+      <h1 style="font-size: 22px; font-weight: 800; color: var(--text-main); letter-spacing: -0.5px; margin-bottom: 6px;">
+        Executive Suite
+      </h1>
+      <p style="font-size: 13.5px; color: var(--text-secondary); margin: 0;">
+        Plataforma Corporativa de Analítica y Auditoría
+      </p>
+    </div>
+
+    <!-- Formulario de Acceso -->
+    <form method="post" action="{{ url_for('login') }}">
+      <input type="hidden" name="next" value="{{ next_url }}">
+      
+      <div style="margin-bottom: 18px;">
+        <label for="username" style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+          Usuario
+        </label>
+        <div style="position: relative;">
+          <input type="text" id="username" name="username" required autofocus placeholder="Nombre de usuario" 
+                 style="width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; background: #f8fafc;">
+        </div>
+      </div>
+
+      <div style="margin-bottom: 24px;">
+        <label for="password" style="font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px;">
+          Contraseña
+        </label>
+        <div style="position: relative;">
+          <input type="password" id="password" name="password" required placeholder="••••••••" 
+                 style="width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 14px; background: #f8fafc;">
+        </div>
+      </div>
+
+      <button type="submit" class="btn-executive primary" style="width: 100%; padding: 13px; font-size: 14.5px; font-weight: 700; justify-content: center; border-radius: var(--radius-md);">
+        Ingresar a la Plataforma
+      </button>
+
+      <!-- Botón 1-Clic para Vista Previa en VS Code / Mobile View -->
+      <div style="margin-top: 14px; text-align: center;">
+        <a href="{{ url_for('preview_login') }}" class="btn-executive secondary" style="width: 100%; padding: 11px; font-size: 13px; font-weight: 700; justify-content: center; text-decoration: none; border: 1.5px dashed #6366f1; color: #4f46e5; background: #eef2ff; border-radius: var(--radius-md); display: inline-flex; align-items: center; gap: 8px;">
+          <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          1-Clic: Entrar en Vista Previa (VS Code / Mobile)
+        </a>
+      </div>
+    </form>
+
+    <script>
+      (function() {
+        // Si el usuario ya tenía un token guardado en el navegador/webview y visita /login (sin haber cerrado sesión explícitamente),
+        // ofrecer enlace directo para restaurar su sesión
+        const hasLoggedOut = window.location.href.includes('logout');
+        if (hasLoggedOut) {
+          try { localStorage.removeItem('jyc_preview_token'); } catch(e){}
+        } else {
+          try {
+            const saved = localStorage.getItem('jyc_preview_token');
+            if (saved) {
+              const previewLink = document.querySelector('a[href*="preview-login"]');
+              if (previewLink) {
+                previewLink.href = "/?auth_token=" + encodeURIComponent(saved);
+              }
+            }
+          } catch(e){}
+        }
+      })();
+    </script>
+
+    <!-- Footer de Seguridad -->
+    <div style="margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); text-align: center;">
+      <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); font-weight: 500;">
+        <svg style="width: 14px; height: 14px; color: #10b981;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        Acceso restringido y cifrado para personal de JYC Equipment
+      </span>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

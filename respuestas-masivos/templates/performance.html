@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}Performance Comercial & Pipeline · JYC Equipment{% endblock %}
+
+{% block content %}
+<!-- BARRA DE FILTROS Y ENCABEZADO EJECUTIVO -->
+<div class="executive-panel" style="margin-bottom: 24px; padding: 20px 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div>
+      <div style="font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--brand); margin-bottom: 4px;">
+        Close CRM · Analítica y Disciplina Comercial
+      </div>
+      <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: var(--text-main); letter-spacing: -0.4px;">
+        Performance de Agentes: Rapport & Pipeline Management
+      </h2>
+      <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">
+        Métricas de conversión directa: efectividad a KPs, duración de llamadas, oportunidades activas y salud de tareas.
+      </p>
+    </div>
+
+    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+      {% if presets %}
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          {% for k, p in presets.items() %}
+            <a href="{{ url_for('performance_view', start_date=p.start, end_date=p.end) }}" 
+               class="badge-pill" 
+               style="background:{% if report.start_date == p.start and report.end_date == p.end %}var(--brand); color:#fff; border-color:var(--brand);{% else %}#f8fafc; color:var(--text-secondary); border:1px solid var(--border);{% endif %} text-decoration:none; font-weight:700; font-size:11.5px; padding:3px 9px;">
+              {{ p.label }}
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <form method="get" action="{{ url_for('performance_view') }}" style="display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;">
+        <div>
+          <label style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 3px;">Desde:</label>
+          <input type="date" name="start_date" value="{{ report.start_date }}" style="padding: 7px 10px; font-size: 13px;">
+        </div>
+        <div>
+          <label style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 3px;">Hasta:</label>
+          <input type="date" name="end_date" value="{{ report.end_date }}" style="padding: 7px 10px; font-size: 13px;">
+        </div>
+        <button type="submit" class="btn-executive primary" style="padding: 8px 14px; font-size: 13px;">
+          <svg style="width: 14px; height: 14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Filtrar
+        </button>
+        <a href="{{ url_for('export_performance_csv', start_date=report.start_date, end_date=report.end_date) }}" class="btn-executive secondary" style="padding: 8px 14px; font-size: 13px; text-decoration: none;">
+          <svg style="width: 14px; height: 14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Exportar CSV
+        </a>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- TARJETAS DE RESUMEN EJECUTIVO -->
+<div class="kpi-grid">
+  <div class="kpi-card accent-indigo">
+    <div class="kpi-header">
+      <span class="kpi-label">Llamadas Totales</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        </svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ "{:,}".format(report.summary.total_calls) }}</div>
+    <div class="kpi-footer">Llamadas salientes del equipo</div>
+  </div>
+
+  <div class="kpi-card accent-emerald">
+    <div class="kpi-header">
+      <span class="kpi-label">KPs Calificados</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+    </div>
+    <div class="kpi-value" style="color: var(--ok);">{{ "{:,}".format(report.summary.total_kps) }}</div>
+    <div class="kpi-footer">Key People contactados</div>
+  </div>
+
+  <div class="kpi-card accent-sky">
+    <div class="kpi-header">
+      <span class="kpi-label">Emails Manuales</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ "{:,}".format(report.summary.total_emails) }}</div>
+    <div class="kpi-footer">Seguimiento comercial 1-a-1</div>
+  </div>
+
+  <div class="kpi-card accent-amber">
+    <div class="kpi-header">
+      <span class="kpi-label">Pipeline Activo</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+    </div>
+    <div class="kpi-value" style="color: var(--warn);">${{ "{:,.0f}".format(report.summary.total_pipeline_value) }}</div>
+    <div class="kpi-footer">Valor de oportunidades vivas</div>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- TABLA 1: DIMENSIÓN RAPPORT & ACTIVIDAD -->
+<!-- ======================================================== -->
+<div class="executive-panel">
+  <div class="panel-header">
+    <div>
+      <h3 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-block; width: 4px; height: 16px; background: var(--brand); border-radius: 2px;"></span>
+        Dimensión Rapport: Calidad y Conexión de Conversaciones
+      </h3>
+      <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0;">
+        Volumen de llamadas salientes, duración de conversación, efectividad a KP y respuesta a emails.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="executive-table">
+      <thead>
+        <tr>
+          <th>Asesor Comercial</th>
+          <th class="num">Llamadas</th>
+          <th class="num">Duración Prom.</th>
+          <th class="num">KPs Hablados</th>
+          <th class="num">Efectividad</th>
+          <th class="num">Emails Enviados</th>
+          <th class="num">Emails Respondidos</th>
+          <th class="num">% Resp. Email</th>
+          <th class="num">Reuniones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in report.agents %}
+          <tr>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="badge-pill" style="display:inline-block; min-width:24px; text-align:center; font-size:11px; font-weight:700; padding:2px 6px; background:{% if loop.index == 1 %}#fef3c7; color:#92400e; border:1px solid #fde68a;{% elif loop.index <= 3 %}#eff6ff; color:#1e40af; border:1px solid #bfdbfe;{% else %}#f1f5f9; color:#475569;{% endif %}">
+                  #{{ loop.index }}
+                </span>
+                <div>
+                  <div style="font-weight: 700; color: var(--text-main);">{{ a.name }}</div>
+                  <div style="font-size: 11.5px; color: var(--text-muted);">{{ a.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="num">{{ a.calls }}</td>
+            <td class="num" style="color: var(--text-secondary);">{{ a.avg_call_duration_min }} min</td>
+            <td class="num" style="color: var(--ok); font-weight: 700;">{{ a.kps }}</td>
+            <td class="num">
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                <div style="width: 48px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; display: inline-block;">
+                  <div style="width: {{ [a.effectiveness, 100]|min }}%; height: 100%; background: #10b981; border-radius: 3px;"></div>
+                </div>
+                <span class="badge-pill" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; min-width: 46px; text-align: right;">
+                  {{ a.effectiveness }}%
+                </span>
+              </div>
+            </td>
+            <td class="num">{{ a.emails_sent }}</td>
+            <td class="num">{{ a.emails_replied }}</td>
+            <td class="num">
+              {% if a.email_reply_rate > 0 %}
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                  <div style="width: 40px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; display: inline-block;">
+                    <div style="width: {{ [a.email_reply_rate, 100]|min }}%; height: 100%; background: #3b82f6; border-radius: 3px;"></div>
+                  </div>
+                  <span class="badge-pill" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; min-width: 46px; text-align: right;">
+                    {{ a.email_reply_rate }}%
+                  </span>
+                </div>
+              {% else %}
+                <span style="color: var(--text-muted); font-size: 12px;">0.0%</span>
+              {% endif %}
+            </td>
+            <td class="num" style="font-weight: 700;">{{ a.meetings }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- TABLA 2: DIMENSIÓN PIPELINE MANAGEMENT & DISCIPLINA -->
+<!-- ======================================================== -->
+<div class="executive-panel">
+  <div class="panel-header">
+    <div>
+      <h3 class="panel-title" style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-block; width: 4px; height: 16px; background: var(--warn); border-radius: 2px;"></span>
+        Dimensión Pipeline Management: Oportunidades y Tareas
+      </h3>
+      <p style="font-size: 13px; color: var(--text-secondary); margin: 4px 0 0;">
+        Oportunidades vivas en Close, valor estimado, alertas de estancamiento (>7 días sin cambios) y tareas vencidas.
+      </p>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="executive-table">
+      <thead>
+        <tr>
+          <th>Asesor Comercial</th>
+          <th class="num">Oportunidades Activas</th>
+          <th class="num">Valor Pipeline</th>
+          <th style="text-align: center;">Estancadas (>7d)</th>
+          <th class="num">Tareas Pendientes</th>
+          <th style="text-align: center;">Tareas Vencidas</th>
+          <th>Estado de Disciplina</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in report.agents %}
+          <tr>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:12px; font-weight:700; color:var(--text-muted); min-width:16px;">#{{ loop.index }}</span>
+                <span style="font-weight: 700;">{{ a.name }}</span>
+              </div>
+            </td>
+            <td class="num">{{ a.active_opps }}</td>
+            <td class="num" style="color: var(--warn);">${{ "{:,.0f}".format(a.pipeline_value) }}</td>
+            <td style="text-align: center;">
+              {% if a.stalled_count > 0 %}
+                <span class="badge-pill" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a;">
+                  ⚠️ {{ a.stalled_count }} estancadas
+                </span>
+              {% else %}
+                <span class="badge-pill" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0;">
+                  Al día
+                </span>
+              {% endif %}
+            </td>
+            <td class="num">{{ a.open_tasks }}</td>
+            <td style="text-align: center;">
+              {% if a.overdue_tasks > 0 %}
+                <span class="badge-pill" style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca;">
+                  ❌ {{ a.overdue_tasks }} vencidas
+                </span>
+              {% else %}
+                <span class="badge-pill" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0;">
+                  0
+                </span>
+              {% endif %}
+            </td>
+            <td>
+              {% if a.overdue_tasks > 20 %}
+                <span style="font-size: 12.5px; color: #b91c1c; font-weight: 600;">🚨 Alto riesgo de desatención</span>
+              {% elif a.stalled_count > 5 %}
+                <span style="font-size: 12.5px; color: #d97706; font-weight: 600;">⚠️ Requiere depuración de tratos</span>
+              {% else %}
+                <span style="font-size: 12.5px; color: #059669; font-weight: 600;">👍 Disciplina operativa óptima</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

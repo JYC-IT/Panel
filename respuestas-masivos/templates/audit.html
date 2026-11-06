@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}Daily Sales Performance Audit · JYC Equipment{% endblock %}
+
+{% block content %}
+<style>
+  @media print {
+    header, nav, .no-print, button { display: none !important; }
+    body { background: white !important; color: black !important; font-size: 11pt !important; }
+    .panel, .card { border: 1px solid #ccc !important; box-shadow: none !important; }
+  }
+</style>
+
+<!-- BARRA DE CONTROL Y SELECTOR -->
+<div class="executive-panel no-print" style="margin-bottom:20px; padding:16px 20px;">
+  <form method="get" action="{{ url_for('audit_view') }}" style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;">
+    <div>
+      <label style="font-size:11.5px; font-weight:700; color:var(--text-secondary); margin-bottom:4px; display:block;">Comercial a Auditar:</label>
+      <select name="user_id" class="custom-select" style="font-weight:600; min-width:240px; padding:8px 12px;" onchange="this.form.submit()">
+        {% for u in users %}
+          <option value="{{ u.id }}" {% if u.id == selected_user_id %}selected{% endif %}>
+            {{ u.name }} {% if u.is_designated %}(Designado){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+        <label style="font-size:11.5px; font-weight:700; color:var(--text-secondary);">Fecha de Auditoría:</label>
+        {% if quick_dates %}
+          <div style="display:flex; gap:4px;">
+            <a href="{{ url_for('audit_view', user_id=selected_user_id, audit_date=quick_dates.today) }}" style="font-size:10.5px; font-weight:700; color:var(--brand); text-decoration:none; padding:1px 5px; background:var(--brand-glow); border-radius:4px;">Hoy</a>
+            <a href="{{ url_for('audit_view', user_id=selected_user_id, audit_date=quick_dates.yesterday) }}" style="font-size:10.5px; font-weight:700; color:var(--brand); text-decoration:none; padding:1px 5px; background:var(--brand-glow); border-radius:4px;">Ayer</a>
+            <a href="{{ url_for('audit_view', user_id=selected_user_id, audit_date=quick_dates.two_days_ago) }}" style="font-size:10.5px; font-weight:700; color:var(--brand); text-decoration:none; padding:1px 5px; background:var(--brand-glow); border-radius:4px;">-2d</a>
+          </div>
+        {% endif %}
+      </div>
+      <input type="date" name="audit_date" value="{{ audit.audit_date }}" class="custom-select" style="padding:8px 12px;" onchange="this.form.submit()">
+    </div>
+
+    <div style="display:flex; gap:8px;">
+      <button type="submit" class="btn-executive primary" style="padding:9px 16px; font-size:13px; font-weight:600;">
+        <svg style="width:14px; height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        Auditar Día
+      </button>
+      <button type="button" class="btn-executive secondary" onclick="window.print()" style="padding:9px 16px; font-size:13px; font-weight:600; display:flex; align-items:center; gap:6px;">
+        <svg style="width:14px; height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+        </svg>
+        Exportar / Imprimir PDF
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- DOCUMENTO AUDIT ESTILO JULIÁN -->
+<div style="background:#fff; border:1px solid var(--line); border-radius:14px; padding:32px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.06); max-width:1100px; margin:0 auto;">
+  
+  <!-- ENCABEZADO -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:3px solid #111827; padding-bottom:16px; margin-bottom:20px; flex-wrap:wrap; gap:16px;">
+    <div>
+      <div style="font-size:11px; font-weight:800; letter-spacing:1.5px; color:#475569; text-transform:uppercase;">
+        JYC EQUIPMENT — EXECUTIVE SALES AUDIT
+      </div>
+      <h1 style="margin:4px 0 6px; font-size:26px; font-weight:900; color:#0f172a;">
+        DAILY SALES PERFORMANCE AUDIT
+      </h1>
+      <p style="margin:0 0 8px; font-size:13px; color:#475569;">
+        Close CRM Activity, Call Rapport Qualification & Pipeline Management Review: <strong>{{ audit.agent_name }}</strong>
+      </p>
+      {% if audit.scores.overall is defined %}
+        <div style="display:inline-flex; align-items:center; gap:8px; background:{% if audit.scores.overall >= 80 %}#ecfdf5; border:1px solid #a7f3d0; color:#065f46;{% elif audit.scores.overall >= 60 %}#fffbeb; border:1px solid #fde68a; color:#92400e;{% else %}#fef2f2; border:1px solid #fecaca; color:#991b1b;{% endif %} padding:4px 12px; border-radius:9999px; font-size:12.5px; font-weight:700;">
+          <span>Score General: {{ audit.scores.overall }}/100</span>
+          <span>·</span>
+          <span>Grado {{ audit.scores.grade }}</span>
+          <span>({{ audit.scores.status }})</span>
+        </div>
+      {% endif %}
+    </div>
+    <div style="text-align:right; font-size:12px; color:#334155;">
+      <div><strong>Date Audited:</strong> {{ audit.audit_date }}</div>
+      <div><strong>Auditor:</strong> Sistema JYC / AI Audit</div>
+      <div><strong>Rep Audited:</strong> {{ audit.agent_name }} ({{ audit.agent_email }})</div>
+    </div>
+  </div>
+
+  <!-- TARJETAS DE KPIs SUPERIORES -->
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:24px;">
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:900; color:#0f172a;">{{ audit.kpis.total_calls }}</div>
+      <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">TOTAL CALLS</div>
+      <div style="font-size:11px; color:#475569; margin-top:2px;">{{ audit.kpis.outbound_calls }} Out / {{ audit.kpis.inbound_calls }} In ({{ audit.kpis.leads_touched }} Leads)</div>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:900; color:#059669;">{{ audit.kpis.kp_connects }} KPs</div>
+      <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">LIVE CONNECTS</div>
+      <div style="font-size:11px; color:#475569; margin-top:2px;">{{ audit.kpis.kp_talk_time_min }}m Live KP Talk</div>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:900; color:#0f172a;">{{ audit.kpis.gross_dial_time_min }}m</div>
+      <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">GROSS DIAL TIME</div>
+      <div style="font-size:11px; color:#475569; margin-top:2px;">Hold & Voicemails</div>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:900; color:#0f172a;">{{ audit.kpis.emails_sent }}</div>
+      <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">EMAILS SENT</div>
+      <div style="font-size:11px; color:#dc2626; margin-top:2px;">{{ audit.kpis.duplicate_emails }} Duplicados</div>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:900; color:#0284c7;">{{ audit.kpis.opps_created }} (${{ "{:,.0f}".format(audit.kpis.opps_value) }})</div>
+      <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">OPPS CREATED</div>
+      <div style="font-size:11px; color:#475569; margin-top:2px;">{% if audit.findings.inverted_pipeline %}<span style="color:#dc2626; font-weight:bold;">⚠️ Pipeline Invertido</span>{% else %}Correcto{% endif %}</div>
+    </div>
+
+    <div style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:8px; padding:12px; text-align:center;">
+      <div style="font-size:26px; font-weight:900; color:#dc2626;">{{ audit.kpis.leads_without_task_count }}</div>
+      <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">SIN TAREA FUTURA</div>
+      <div style="font-size:11px; color:#dc2626; margin-top:2px;">{{ audit.kpis.overdue_tasks_count }} Vencidas en cola</div>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 1: RAPPORT QUALIFICATION -->
+  <div style="margin-bottom:28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; color:#fff; padding:8px 14px; border-radius:6px; margin-bottom:12px;">
+      <h3 style="margin:0; font-size:15px; font-weight:700;">1. Rapport Qualification (Evaluated Against Best Practices)</h3>
+      <span class="badge" style="background:#fef08a; color:#854d0e; font-weight:800; font-size:13px; padding:4px 10px;">
+        Dimension Score: {{ audit.scores.rapport }} / 5.0
+      </span>
+    </div>
+
+    <table>
+      <thead>
+        <tr style="background:#f1f5f9;">
+          <th style="width:25%;">Pilar de Buenas Prácticas</th>
+          <th style="width:15%;">Calificación</th>
+          <th style="width:60%;">Hallazgos del Día & Evidencia de Llamadas</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>1. Warm Opener & Permission</strong><div class="muted" style="font-size:11px;">Pedir permiso antes de pitchear ("¿Te tomo en mal momento?")</div></td>
+          <td>
+            {% if audit.findings.short_live_calls_count >= 2 %}
+              <span class="badge" style="background:#fee2e2; color:#991b1b; font-weight:700;">WEAK</span>
+            {% else %}
+              <span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700;">GOOD</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;">
+            {% if audit.findings.short_live_calls_count >= 2 %}
+              Se detectaron <strong>{{ audit.findings.short_live_calls_count }} llamadas de menos de 35s</strong> con tomadores de decisión. Tendencia a apresurar la pregunta binaria ("¿tienes montacargas para venta?") sin generar empatía inicial.
+            {% else %}
+              Buenas aperturas en las llamadas conectadas, ritmo adecuado de inicio.
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td><strong>2. Open-Ended Fleet Discovery</strong><div class="muted" style="font-size:11px;">Preguntas abiertas sobre tamaño de flota, ciclos de reemplazo y leasing.</div></td>
+          <td>
+            {% if audit.findings.short_live_calls_count >= 2 %}
+              <span class="badge" style="background:#fee2e2; color:#991b1b; font-weight:700;">POOR</span>
+            {% else %}
+              <span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700;">AVERAGE</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;">
+            Cuando el prospecto responde "No tenemos nada hoy", se debe evitar colgar de inmediato. Indagar fechas de recambio de maquinaria o necesidades de compra futuras.
+          </td>
+        </tr>
+        <tr>
+          <td><strong>3. Continuidad & Pacing Diario</strong><div class="muted" style="font-size:11px;">Ritmo de prospección continuo y sin lagunas en la tarde.</div></td>
+          <td>
+            {% if audit.findings.calling_gaps %}
+              <span class="badge" style="background:#fee2e2; color:#991b1b; font-weight:700;">CRITICAL GAP</span>
+            {% else %}
+              <span class="badge" style="background:#dcfce7; color:#15803d; font-weight:700;">CONSISTENT</span>
+            {% endif %}
+          </td>
+          <td style="font-size:13px;">
+            {% if audit.findings.calling_gaps %}
+              {% for g in audit.findings.calling_gaps %}
+                <strong>Bache de {{ g.duration_hours }} horas sin llamadas</strong> entre las {{ g.start }} y las {{ g.end }}.
+              {% endfor %}
+            {% else %}
+              Distribución balanceada de llamadas a lo largo de la jornada laboral.
+            {% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- SECCIÓN 2: PIPELINE MANAGEMENT & HYGIENE -->
+  <div style="margin-bottom:28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; background:#1e293b; color:#fff; padding:8px 14px; border-radius:6px; margin-bottom:12px;">
+      <h3 style="margin:0; font-size:15px; font-weight:700;">2. Opportunity Findings & Pipeline Management</h3>
+      <span class="badge" style="background:#fed7aa; color:#9a3412; font-weight:800; font-size:13px; padding:4px 10px;">
+        Dimension Score: {{ audit.scores.pipeline }} / 5.0
+      </span>
+    </div>
+
+    <!-- ERRORES CRÍTICOS IDENTIFICADOS -->
+    {% if audit.findings.inverted_pipeline %}
+      <div style="background:#fef2f2; border:1px solid #fecaca; border-left:4px solid #dc2626; border-radius:8px; padding:14px; margin-bottom:14px;">
+        <h4 style="margin:0 0 6px; color:#991b1b; font-size:14px; font-weight:800;">
+          Error Crítico: Pipeline Invertido (Compra registrada en Sell Pipeline)
+        </h4>
+        <p style="margin:0; font-size:13px; color:#7f1d1d;">
+          Close CRM tiene dos pipelines independientes: <strong>Purchase</strong> (Wants to Sell) y <strong>Sell</strong> (Wants to Buy).
+          Se detectaron oportunidades de compra de maquinaria registradas en el pipeline de ventas:
+        </p>
+        <ul style="margin:6px 0 0; padding-left:20px; font-size:13px; color:#991b1b;">
+          {% for inv in audit.findings.inverted_pipeline %}
+            <li><strong>{{ inv.lead_name }} (${{ "{:,.0f}".format(inv.value) }}):</strong> {{ inv.issue }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {% if audit.findings.leads_without_future_task %}
+      <div style="background:#fffbeb; border:1px solid #fef3c7; border-left:4px solid #f59e0b; border-radius:8px; padding:14px; margin-bottom:14px;">
+        <h4 style="margin:0 0 6px; color:#92400e; font-size:14px; font-weight:800;">
+          Fuga de Prospectos (Queue Leakage): {{ audit.findings.leads_without_future_task|length }} Leads Tocados Hoy Sin Tarea de Seguimiento
+        </h4>
+        <p style="margin:0; font-size:13px; color:#78350f;">
+          Los siguientes prospectos fueron contactados hoy pero quedaron sin ningún recordatorio o tarea abierta en Close CRM (riesgo de olvido):
+        </p>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          {% for lw in audit.findings.leads_without_future_task %}
+            {% if lw.lead_id %}
+              <a href="https://app.close.com/lead/{{ lw.lead_id }}/" target="_blank" rel="noopener" class="badge" style="background:#fef3c7; color:#78350f; font-weight:700; font-size:11.5px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; border:1px solid #fde68a;" title="Abrir en Close CRM para crear tarea">
+                <span>{{ lw.lead_name }}</span>
+                <span style="font-size:10px; opacity:0.8;">↗</span>
+              </a>
+            {% else %}
+              <span class="badge" style="background:#fef3c7; color:#78350f; font-weight:600; font-size:11px;">
+                {{ lw.lead_name }}
+              </span>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- SECCIÓN 3: LOG CRONOLÓGICO DE ACTIVIDAD -->
+  <div style="margin-bottom:28px;">
+    <h3 style="margin:0 0 10px; font-size:15px; font-weight:700; color:#1e293b;">
+      3. Complete Chronological Activity Log ({{ audit.audit_date }})
+    </h3>
+    <div style="max-height:350px; overflow-y:auto; border:1px solid var(--line); border-radius:8px;">
+      <table>
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="width:10%;">Hora</th>
+            <th style="width:26%;">Lead / Empresa</th>
+            <th style="width:16%;">Actividad</th>
+            <th style="width:18%;">Audio / Grabación</th>
+            <th style="width:30%;">Disposición y Notas de Auditoría</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in audit.activity_log %}
+            <tr>
+              <td class="num" style="font-weight:700; color:#475569;">{{ log.time }}</td>
+              <td style="font-weight:600; color:#0f172a;">
+                {% if log.lead_id %}
+                  <a href="https://app.close.com/lead/{{ log.lead_id }}/" target="_blank" rel="noopener" style="color:var(--brand); text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700;" title="Abrir lead en Close CRM">
+                    <span>{{ log.lead_name }}</span>
+                    <span style="font-size:11px; opacity:0.75;">↗</span>
+                  </a>
+                {% else %}
+                  {{ log.lead_name }}
+                {% endif %}
+              </td>
+              <td><span class="badge" style="background:#f1f5f9; color:#334155;">{{ log.type }}</span></td>
+              <td>
+                {% if log.has_recording %}
+                  <audio controls preload="none" style="height:28px; width:140px; vertical-align:middle;">
+                    <source src="{{ url_for('call_recording_proxy', call_id=log.call_id) }}" type="audio/mpeg">
+                    Tu navegador no soporta audio.
+                  </audio>
+                {% else %}
+                  <span class="muted" style="font-size:11px;">Sin audio</span>
+                {% endif %}
+              </td>
+              <td style="font-size:12px; color:#475569;">{{ log.notes }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SECCIÓN 4: CHECKLIST DE COACHING Y REMEDIACIÓN INMEDIATA -->
+  <div style="background:#eff6ff; border:1px solid #bfdbfe; border-left:4px solid #2563eb; border-radius:10px; padding:20px;">
+    <h3 style="margin:0 0 10px; font-size:16px; font-weight:800; color:#1e40af;">
+      Immediate Coaching & Remediation Checklist (Para {{ audit.agent_name }})
+    </h3>
+    <ol style="margin:0; padding-left:22px; font-size:13px; color:#1e3a8a; line-height:1.6;">
+      {% for item in audit.coaching_checklist %}
+        <li style="margin-bottom:6px;"><strong>{{ item }}</strong></li>
+      {% endfor %}
+    </ol>
+  </div>
+
+</div>
+{% endblock %}

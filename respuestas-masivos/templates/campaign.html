@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }} · Detalle de Campaña{% endblock %}
+
+{% block content %}
+<!-- BREADCRUMB & HEADER -->
+<div style="margin-bottom: 24px;">
+  <a href="{{ url_for('index') }}" class="btn-executive secondary" style="font-size: 12.5px; padding: 6px 12px; margin-bottom: 12px;">
+    <svg style="width: 14px; height: 14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+    </svg>
+    Volver a Campañas
+  </a>
+  <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+        <h1 style="font-size: 24px; font-weight: 800; color: var(--text-main); margin: 0; letter-spacing: -0.5px;">
+          {{ c.name }}
+        </h1>
+        <span class="badge-pill source-{{ c.source }}">
+          {{ c.source|capitalize }}
+        </span>
+      </div>
+      {% if c.match_subject %}
+        <p style="font-size: 13.5px; color: var(--text-secondary); margin: 0;">
+          Asunto rastreado: <strong style="color: var(--text-main);">“{{ c.match_subject }}”</strong>
+          {% if c.start_date %} · Desde: <strong>{{ c.start_date }}</strong>{% endif %}
+          {% if c.reply_to_email %} · Buzón: <strong style="color: var(--brand);">{{ c.reply_to_email }}</strong>{% endif %}
+        </p>
+      {% endif %}
+    </div>
+
+    {% if is_admin %}
+      <div style="display: flex; gap: 8px; align-items: center;">
+        {% if c.source == 'gmail' %}
+          <form class="inline" method="post" action="{{ url_for('update_campaign', cid=c.id) }}" style="display: flex; gap: 6px;">
+            <input name="sent_count" type="number" min="0" value="{{ c.sent_count or '' }}" placeholder="Enviados" style="width: 110px; padding: 8px 10px; font-size: 13px;">
+            <button class="btn-executive secondary" type="submit" style="font-size: 13px;">Guardar</button>
+          </form>
+        {% endif %}
+
+        <form class="inline" method="post" action="{{ url_for('delete_campaign', cid=c.id) }}"
+              onsubmit="return confirm('¿Eliminar esta campaña del panel? No borrará correos de tu servidor.')">
+          <button class="btn-executive" style="background: #fff; color: var(--err); border: 1px solid #fecaca; font-size: 13px;" type="submit">
+            <svg style="width: 14px; height: 14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Eliminar
+          </button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- TARJETAS DE MÉTRICAS EJECUTIVAS -->
+<div class="kpi-grid">
+  <div class="kpi-card accent-sky">
+    <div class="kpi-header">
+      <span class="kpi-label">Enviados</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ "{:,}".format(c.sent_count) if c.sent_count else "—" }}</div>
+    <div class="kpi-footer">Base de destinatarios</div>
+  </div>
+
+  {% if c.opens_count %}
+  <div class="kpi-card accent-emerald">
+    <div class="kpi-header">
+      <span class="kpi-label">Aperturas</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ "{:,}".format(c.opens_count) }}</div>
+    <div class="kpi-footer">Lecturas registradas</div>
+  </div>
+  {% endif %}
+
+  {% if c.clicks_count %}
+  <div class="kpi-card accent-amber">
+    <div class="kpi-header">
+      <span class="kpi-label">Clics</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" /></svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ "{:,}".format(c.clicks_count) }}</div>
+    <div class="kpi-footer">Interesados en enlaces</div>
+  </div>
+  {% endif %}
+
+  <div class="kpi-card accent-indigo">
+    <div class="kpi-header">
+      <span class="kpi-label">Respuestas Reales</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ c.replies }}</div>
+    <div class="kpi-footer">Sin automáticas</div>
+  </div>
+
+  <div class="kpi-card accent-emerald">
+    <div class="kpi-header">
+      <span class="kpi-label">Personas Únicas</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ c.responders }}</div>
+    <div class="kpi-footer">Leads potenciales</div>
+  </div>
+
+  <div class="kpi-card accent-rose">
+    <div class="kpi-header">
+      <span class="kpi-label">Tasa de Respuesta</span>
+      <div class="kpi-icon-bubble">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+      </div>
+    </div>
+    <div class="kpi-value">{{ c.rate if c.rate is not none else "—" }}{% if c.rate is not none %}%{% endif %}</div>
+    <div class="kpi-footer">Conversión directa</div>
+  </div>
+</div>
+
+<!-- PANEL PRINCIPAL CON PESTAÑAS -->
+<div class="executive-panel">
+  <div class="panel-header">
+    <div style="display: flex; gap: 8px;">
+      <a href="{{ url_for('campaign', cid=c.id, tab='replies') }}" class="btn-executive {{ 'primary' if active_tab != 'clicks' else 'secondary' }}">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+        Respuestas por Correo ({{ replies|length }})
+      </a>
+      {% if c.source == 'constantcontact' or clicks %}
+      <a href="{{ url_for('campaign', cid=c.id, tab='clicks') }}" class="btn-executive {{ 'primary' if active_tab == 'clicks' else 'secondary' }}">
+        <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
+        </svg>
+        Clics e Interesados ({{ clicks|length }})
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- Acciones de Exportación y Filtros de Respuestas -->
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+      {% if active_tab == 'clicks' %}
+        <a class="btn-executive secondary" href="{{ url_for('export_csv', cid=c.id, type='clicks') }}">
+          <svg style="width: 15px; height: 15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Exportar Clics a CSV
+        </a>
+      {% else %}
+        <a class="btn-executive secondary" href="{{ url_for('export_csv', cid=c.id, type='replies') }}">
+          <svg style="width: 15px; height: 15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Exportar Respuestas a CSV
+        </a>
+        {% if show_auto %}
+          <a class="btn-executive secondary" href="{{ url_for('campaign', cid=c.id, tab='replies') }}">
+            Ocultar Automáticas
+          </a>
+        {% else %}
+          <a class="btn-executive secondary" href="{{ url_for('campaign', cid=c.id, tab='replies', auto=1) }}">
+            Mostrar Automáticas ({{ c.auto_replies }})
+          </a>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% if active_tab == 'clicks' %}
+    <!-- VISTA DE CLICS / CONTACTOS INTERESADOS -->
+    {% if clicks %}
+    <div class="table-responsive">
+      <table class="executive-table">
+        <thead>
+          <tr>
+            <th>Contacto</th>
+            <th>Enlace Visitado</th>
+            <th class="num">Fecha y Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for cl in clicks %}
+          <tr>
+            <td>
+              <div style="font-weight: 700; color: var(--text-main);">{{ cl.first_name }} {{ cl.last_name }}</div>
+              <div style="font-size: 12px; color: var(--text-muted);">{{ cl.email }}</div>
+            </td>
+            <td>
+              <a href="{{ cl.detail }}" target="_blank" rel="noopener noreferrer" style="color: var(--brand); font-weight: 500; word-break: break-all;">
+                {{ cl.detail }}
+              </a>
+            </td>
+            <td class="num" style="color: var(--text-secondary); font-size: 12.5px;">
+              {{ cl.interacted_at|fecha }}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+        <p style="font-size: 14px; margin-bottom: 12px;">Aún no se han detectado clics individuales para esta campaña.</p>
+        <span class="badge-pill source-cc">Constant Contact Tracking</span>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <!-- BARRA DE FILTRADO POR INTENCIÓN COMERCIAL -->
+    <div class="intent-filter-bar">
+      <span style="font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px;">
+        Calificación:
+      </span>
+      <a href="{{ url_for('campaign', cid=c.id, tab='replies', auto=1 if show_auto else None) }}"
+         class="intent-tab {% if not selected_intent %}active{% endif %}">
+        <span>Todas</span>
+        <span class="tab-count">{{ total_replies_count }}</span>
+      </a>
+      <a href="{{ url_for('campaign', cid=c.id, tab='replies', auto=1 if show_auto else None, intent='buy') }}"
+         class="intent-tab {% if selected_intent == 'buy' %}active{% endif %}"
+         style="{% if selected_intent == 'buy' %}border-color: #a7f3d0; background: #ecfdf5; color: #065f46;{% endif %}">
+        <span>Compradores</span>
+        <span class="tab-count" style="{% if selected_intent == 'buy' %}background: #059669; color: #fff;{% endif %}">{{ intent_counts.get('buy', 0) }}</span>
+      </a>
+      <a href="{{ url_for('campaign', cid=c.id, tab='replies', auto=1 if show_auto else None, intent='sell') }}"
+         class="intent-tab {% if selected_intent == 'sell' %}active{% endif %}"
+         style="{% if selected_intent == 'sell' %}border-color: #bae6fd; background: #f0f9ff; color: #0284c7;{% endif %}">
+        <span>Ofrecen Equipo</span>
+        <span class="tab-count" style="{% if selected_intent == 'sell' %}background: #0284c7; color: #fff;{% endif %}">{{ intent_counts.get('sell', 0) }}</span>
+      </a>
+      <a href="{{ url_for('campaign', cid=c.id, tab='replies', auto=1 if show_auto else None, intent='optout') }}"
+         class="intent-tab {% if selected_intent == 'optout' %}active{% endif %}"
+         style="{% if selected_intent == 'optout' %}border-color: #fecaca; background: #fef2f2; color: #dc2626;{% endif %}">
+        <span>Bajas / Rechazos</span>
+        <span class="tab-count" style="{% if selected_intent == 'optout' %}background: #dc2626; color: #fff;{% endif %}">{{ intent_counts.get('optout', 0) }}</span>
+      </a>
+      <a href="{{ url_for('campaign', cid=c.id, tab='replies', auto=1 if show_auto else None, intent='general') }}"
+         class="intent-tab {% if selected_intent == 'general' %}active{% endif %}">
+        <span>General</span>
+        <span class="tab-count">{{ intent_counts.get('general', 0) }}</span>
+      </a>
+    </div>
+
+    <!-- VISTA DE RESPUESTAS POR CORREO -->
+    {% if replies %}
+    <div class="table-responsive">
+      <table class="executive-table">
+        <thead>
+          <tr>
+            <th>Remitente</th>
+            <th style="width: 175px;">Intención / Lead</th>
+            <th class="num" style="width: 160px;">Fecha y Hora</th>
+            <th>Contenido del Mensaje</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in replies %}
+          {% set cur_intent = r.intent or 'general' %}
+          {% set cfg = intent_config.get(cur_intent, intent_config.general) %}
+          <tr>
+            <td style="white-space: nowrap;">
+              <div style="font-weight: 700; color: var(--text-main);">{{ r.from_name or r.from_email }}</div>
+              {% if r.from_name %}<div style="font-size: 12px; color: var(--text-muted);">{{ r.from_email }}</div>{% endif %}
+              {% if r.is_auto %}
+                <span class="badge-pill" style="background: #fee2e2; color: #991b1b; font-size: 10.5px; margin-top: 4px;">Automática</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+                <span class="badge-pill intent-{{ cur_intent }}" title="{{ cfg.description }}">
+                  {{ cfg.short_label }}
+                </span>
+                <form method="post" action="{{ url_for('set_reply_intent', rid=r.id) }}" style="margin: 0;">
+                  <select name="intent" class="intent-select-dropdown" onchange="this.form.submit()" title="Cambiar clasificación">
+                    <option value="buy" {% if cur_intent == 'buy' %}selected{% endif %}>Comprador</option>
+                    <option value="sell" {% if cur_intent == 'sell' %}selected{% endif %}>Ofrece Equipo</option>
+                    <option value="optout" {% if cur_intent == 'optout' %}selected{% endif %}>Baja / No interesado</option>
+                    <option value="general" {% if cur_intent == 'general' %}selected{% endif %}>General</option>
+                  </select>
+                </form>
+              </div>
+            </td>
+            <td class="num" style="color: var(--text-secondary); font-size: 12.5px;">
+              {{ r.received_at|fecha }}
+            </td>
+            <td>
+              <div style="font-size: 13.5px; color: var(--text-main); line-height: 1.4;">
+                {{ r.snippet or "(Sin contenido legible)" }}
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                Asunto: {{ r.subject }}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <div style="text-align: center; padding: 48px 20px; color: var(--text-muted);">
+        <p style="font-size: 14px; margin-bottom: 0;">
+          {% if selected_intent %}
+            No hay respuestas con clasificación «{{ intent_config.get(selected_intent, {}).get('label', selected_intent) }}».
+          {% else %}
+            Todavía no hay respuestas recibidas en los buzones de correo monitoreados.
+          {% endif %}
+        </p>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

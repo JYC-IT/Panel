@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}JYC Equipment · Executive Suite{% endblock %}</title>
+  
+  <!-- CSS Sistema de Diseño Ejecutivo -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/executive.css') }}">
+  
+  <!-- Compatibilidad de estilos legados -->
+  <style>
+    .bar { height:6px; background:#e2e8f0; border-radius:4px; overflow:hidden; width:80px; display:inline-block; vertical-align:middle; margin-left:6px; }
+    .bar > span { display:block; height:100%; background:var(--ok); border-radius:4px; }
+    .controls-bar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-bottom:20px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px 20px; box-shadow:var(--shadow-xs); }
+    .control-group { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .pagination-bar { display:flex; justify-content:space-between; align-items:center; margin-top:20px; padding-top:16px; border-top:1px solid var(--border); font-size:13px; color:var(--text-secondary); }
+    .page-btn { padding:6px 14px; border:1px solid var(--border); background:white; border-radius:var(--radius-md); cursor:pointer; font-size:13px; font-weight:600; color:var(--text-main); transition:all 0.15s; }
+    .page-btn:hover:not(:disabled) { background:var(--surface-alt); border-color:var(--border-strong); }
+    .page-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    .page-btn.active { background:var(--brand); color:white; border-color:var(--brand); }
+    select.custom-select, input[type="text"], input[type="date"], input[type="number"] {
+      padding:9px 12px; border-radius:var(--radius-md); border:1px solid var(--border); font-size:13.5px; background:white; color:var(--text-main); outline:none; font-family:inherit; transition:border 0.15s, box-shadow 0.15s;
+    }
+    select.custom-select:focus, input:focus { border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-glow); }
+    .badge { display:inline-flex; align-items:center; padding:3px 9px; border-radius:9999px; font-size:11.5px; font-weight:600; background:#e0e7ff; color:#3730a3; }
+    .badge.instantly { background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; }
+    .badge.constantcontact { background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+    .badge.auto { background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+    .badge.advisor { background:#f8fafc; color:#334155; border:1px solid #e2e8f0; font-weight:600; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:18px; margin-bottom:26px; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow-xs); }
+    .card .k { color:var(--text-secondary); font-size:12.5px; font-weight:600; text-transform:uppercase; letter-spacing:0.4px; }
+    .card .v { font-size:30px; font-weight:800; margin-top:6px; color:var(--text-main); font-variant-numeric:tabular-nums; }
+    .panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px; margin-bottom:26px; box-shadow:var(--shadow-xs); }
+    .btn { background:var(--brand); color:#fff; border:0; padding:9px 16px; border-radius:var(--radius-md); cursor:pointer; font-size:13.5px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:all 0.15s; }
+    .btn:hover { background:var(--brand-hover); }
+    .btn.light { background:#fff; color:var(--text-main); border:1px solid var(--border); box-shadow:var(--shadow-xs); }
+    .btn.light:hover { background:var(--surface-alt); border-color:var(--border-strong); }
+    .btn.danger { background:#fff; color:var(--err); border:1px solid #fecaca; }
+    .btn.danger:hover { background:var(--err-subtle); }
+    form.inline { display:inline; }
+    .grid-form { display:grid; grid-template-columns:2fr 2fr 1fr 1fr auto; gap:12px; align-items:end; }
+    label { font-size:12px; font-weight:600; color:var(--text-secondary); display:block; margin-bottom:5px; }
+    th.sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+    th.sortable:hover { color:var(--brand); }
+    .sort-icon { font-size:10px; margin-left:3px; opacity:0.4; }
+    th.sortable.active-sort { color:var(--brand); }
+    th.sortable.active-sort .sort-icon { opacity:1; }
+  </style>
+  
+  <script src="{{ url_for('static', filename='chart.umd.min.js') }}"></script>
+  <script>
+    if (typeof Chart === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"><\/script>');
+    }
+  </script>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ==================== SIDEBAR LATERAL ==================== -->
+  {% if current_user %}
+  <aside class="sidebar" id="sidebar">
+    <!-- Encabezado de Marca -->
+    <div class="sidebar-header">
+      <div class="sidebar-logo">JYC</div>
+      <div class="sidebar-brand-text">
+        <span class="sidebar-brand-title">JYC Equipment</span>
+        <span class="sidebar-brand-badge">Executive Suite</span>
+      </div>
+    </div>
+
+    <!-- Navegación por Módulos -->
+    <nav class="sidebar-nav">
+      <!-- MÓDULO 1: MASIVOS -->
+      <div>
+        <div class="nav-section-title">Operaciones & Masivos</div>
+        <ul class="nav-list">
+          <li>
+            <a href="{{ url_for('index') }}" class="nav-link {% if active_page == 'campaigns' %}active{% endif %}">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              <span>Campañas & Respuestas</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- MÓDULO 2: DIRECCIÓN COMERCIAL -->
+      <div>
+        <div class="nav-section-title">Dirección Comercial</div>
+        <ul class="nav-list">
+          <li>
+            <a href="{{ url_for('weekly_report') }}" class="nav-link {% if active_page == 'weekly_report' %}active{% endif %}">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <span>Reunión Semanal (KPIs)</span>
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('performance_view') }}" class="nav-link {% if active_page == 'performance' %}active{% endif %}">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <span>Performance Agentes</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- MÓDULO 3: CONTROL & CALIDAD -->
+      <div>
+        <div class="nav-section-title">Control & Calidad</div>
+        <ul class="nav-list">
+          <li>
+            <a href="{{ url_for('audit_view') }}" class="nav-link {% if active_page == 'audit' %}active{% endif %}">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              <span>Auditoría Diaria Close CRM</span>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Estado del Sistema en Vivo -->
+    <div class="sidebar-status-card">
+      <div class="status-indicator">
+        <span class="pulse-dot"></span>
+        <span>Sistema Operativo</span>
+      </div>
+      <div class="status-subtitle">
+        Sync cada {{ interval or 15 }}m · Close & Workspace
+      </div>
+    </div>
+
+    <!-- Perfil de Usuario y Logout -->
+    <div class="sidebar-footer">
+      <div class="user-profile">
+        <div class="user-avatar">
+          {{ current_user.name[:2]|upper }}
+        </div>
+        <div class="user-meta">
+          <span class="user-name">{{ current_user.name }}</span>
+          <span class="user-role-badge">{{ current_user.role }}</span>
+        </div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="logout-btn" title="Cerrar sesión">
+        <svg style="width:18px; height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+      </a>
+    </div>
+  </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+  {% endif %}
+
+  <!-- ==================== CONTENIDO PRINCIPAL ==================== -->
+  <div class="main-content" {% if not current_user %}style="margin-left:0;"{% endif %}>
+    {% if current_user %}
+    <!-- Topbar Superior con Acciones -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-toggle" onclick="toggleSidebar()" aria-label="Abrir Menú">
+          <svg style="width:22px; height:22px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div class="topbar-title-wrap">
+          <h1 class="topbar-title">
+            {% if active_page == 'campaigns' %}Campañas & Respuestas de Masivos
+            {% elif active_page == 'weekly_report' %}Reunión Semanal de Ventas (6 Semanas)
+            {% elif active_page == 'performance' %}Desempeño y Métricas de Asesores
+            {% elif active_page == 'audit' %}Auditoría Diaria Close CRM
+            {% else %}Panel de Control
+            {% endif %}
+          </h1>
+          <span class="topbar-subtitle">JYC Equipment · Gestión y Analítica Comercial</span>
+        </div>
+      </div>
+
+      <!-- Acciones de Cabecera -->
+      <div class="topbar-actions">
+        {% if is_admin %}
+          <a href="{{ url_for('connect_constant_contact') }}" class="btn-executive secondary">
+            <svg style="width:16px; height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            <span>Constant Contact</span>
+          </a>
+          <form class="inline" method="post" action="{{ url_for('sync_now') }}">
+            <button class="btn-executive primary" type="submit">
+              <svg style="width:16px; height:16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span>Sincronizar Ahora</span>
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </header>
+    {% endif %}
+
+    <!-- Contenedor del Contenido Específico -->
+    <main class="content-body">
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for cat, m in msgs %}
+          <div class="flash-message {{ cat }}">
+            {% if cat == 'ok' %}
+              <svg style="width:18px; height:18px; flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+            {% else %}
+              <svg style="width:18px; height:18px; flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {% endif %}
+            <span>{{ m }}</span>
+          </div>
+        {% endfor %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<script>
+  function toggleSidebar() {
+    const sb = document.getElementById('sidebar');
+    const bd = document.getElementById('sidebarBackdrop');
+    if (!sb) return;
+    sb.classList.toggle('open');
+    if (bd) {
+      if (sb.classList.contains('open')) {
+        bd.classList.add('visible');
+      } else {
+        bd.classList.remove('visible');
+      }
+    }
+  }
+
+  function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'flex';
+  }
+
+  function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  }
+
+  // Compatibilidad universal con extensiones de previsualización en VS Code (Mobile View, Simple Browser, Live Preview)
+  (function() {
+    const serverToken = "{{ current_auth_token or '' }}";
+    if (serverToken) {
+      try { localStorage.setItem('jyc_preview_token', serverToken); } catch(e){}
+    }
+    const token = serverToken || (function() {
+      try { return localStorage.getItem('jyc_preview_token') || ''; } catch(e){ return ''; }
+    })();
+
+    if (token) {
+      // Interceptar clics en enlaces locales para no perder la sesión en navegadores/webviews con cookies de terceros bloqueadas
+      document.addEventListener('click', function(e) {
+        const a = e.target.closest('a');
+        if (a && a.href && a.origin === window.location.origin) {
+          const path = a.pathname || '';
+          if (!path.includes('logout') && !a.href.includes('auth_token=')) {
+            const sep = a.href.includes('?') ? '&' : '?';
+            a.href = a.href + sep + 'auth_token=' + encodeURIComponent(token);
+          }
+        }
+      }, true);
+
+      // Inyectar en formularios locales si no tienen auth_token
+      document.addEventListener('submit', function(e) {
+        const form = e.target;
+        if (form && (!form.action || form.action.startsWith(window.location.origin))) {
+          if (!form.querySelector('input[name="auth_token"]')) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'auth_token';
+            hidden.value = token;
+            form.appendChild(hidden);
+          }
+        }
+      }, true);
+    }
+  })();
+</script>
+</body>
+</html>
