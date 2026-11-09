@@ -111,6 +111,7 @@ def register_report_routes(app):
             "outreach_instantly": [w["outreach_emails_instantly"] for w in weekly_kpis],
             "outreach_sms": [w["outreach_sms"] for w in weekly_kpis],
             "opens": [w["opens_count"] for w in weekly_kpis],
+            "clicks_count": [w.get("clicks_count", 0) for w in weekly_kpis],
             "click_rate": [w["click_rate"] for w in weekly_kpis],
             "notes": [w["notes"] or "" for w in weekly_kpis],
             # Negocios
@@ -279,6 +280,7 @@ def register_report_routes(app):
         sms = int(request.form.get("outreach_sms") or 0)
         tot = cc + instantly + sms
         opens = int(request.form.get("opens_count") or 0)
+        clicks_count = int(request.form.get("clicks_count") or request.form.get("clicks") or 0)
         click_rate = float(request.form.get("click_rate") or 0.0)
 
         with db.get_conn() as conn:
@@ -289,9 +291,10 @@ def register_report_routes(app):
                        outreach_sms = ?,
                        total_outreach = ?,
                        opens_count = ?,
+                       clicks_count = ?,
                        click_rate = ?
                    WHERE week_number = ?""",
-                (cc, instantly, sms, tot, opens, click_rate, week_number),
+                (cc, instantly, sms, tot, opens, clicks_count, click_rate, week_number),
             )
         flash(f"Envíos y métricas de la Semana {week_number} actualizados (Instantly: {instantly:,}, CC: {cc:,}, SMS: {sms:,}).", "ok")
         return redirect(url_for("weekly_report"))

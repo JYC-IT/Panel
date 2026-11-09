@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS weekly_team_kpis (
     outreach_sms INTEGER DEFAULT 0,
     total_outreach INTEGER DEFAULT 0,
     opens_count INTEGER DEFAULT 0,
+    clicks_count INTEGER DEFAULT 0,
     click_rate REAL DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -135,6 +136,7 @@ def init_db():
         for col, ctype in [
             ("ringcentral_calls", "INTEGER DEFAULT 0"),
             ("close_crm_calls", "INTEGER DEFAULT 0"),
+            ("clicks_count", "INTEGER DEFAULT 0"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE weekly_team_kpis ADD COLUMN {col} {ctype}")

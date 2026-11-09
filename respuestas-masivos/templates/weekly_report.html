@@ -369,6 +369,7 @@
           <th style="text-align:right;">Launch Control (SMS)</th>
           <th style="text-align:right;">Total Envíos</th>
           <th style="text-align:right;">Aperturas</th>
+          <th style="text-align:right; color:#0284c7;">Clics Reales</th>
           <th style="text-align:right;">Tasa de Clic (%)</th>
           {% if is_admin %}<th style="text-align:center;">Acción</th>{% endif %}
         </tr>
@@ -395,12 +396,13 @@
             </td>
             <td class="num" style="text-align:right; font-weight:700;">{{ "{:,}".format(w.total_outreach) }}</td>
             <td class="num" style="text-align:right; font-weight:600; color:#1e3a8a;">{{ "{:,}".format(w.opens_count) }}</td>
+            <td class="num" style="text-align:right; font-weight:700; color:#0284c7;">{{ "{:,}".format(w.clicks_count or 0) }}</td>
             <td class="num" style="text-align:right;">
               <span class="badge" style="background:#e0f2fe; color:#0284c7; font-weight:700;">{{ w.click_rate }}%</span>
             </td>
             {% if is_admin %}
             <td style="text-align:center;">
-              <button type="button" class="btn light" style="padding:3px 8px; font-size:11px;" onclick="openEditOutreachModal({{ w.week_number }}, '{{ w.week_label }}', '{{ w.date_range }}', {{ w.outreach_emails_cc }}, {{ w.outreach_emails_instantly }}, {{ w.outreach_sms }}, {{ w.opens_count }}, {{ w.click_rate }})">
+              <button type="button" class="btn light" style="padding:3px 8px; font-size:11px;" onclick="openEditOutreachModal({{ w.week_number }}, '{{ w.week_label }}', '{{ w.date_range }}', {{ w.outreach_emails_cc }}, {{ w.outreach_emails_instantly }}, {{ w.outreach_sms }}, {{ w.opens_count }}, {{ w.clicks_count or 0 }}, {{ w.click_rate }})">
                 ✏️ Editar
               </button>
             </td>
@@ -650,14 +652,18 @@
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:18px;">
         <div>
           <label style="font-weight:600; font-size:13px;">Aperturas Registradas</label>
           <input id="edit_opens" name="opens_count" type="number" min="0" placeholder="45000">
         </div>
         <div>
-          <label style="font-weight:600; font-size:13px;">Tasa de Clic % (ej. 26.4)</label>
-          <input id="edit_clicks" name="click_rate" type="number" step="0.1" min="0" placeholder="26.4">
+          <label style="font-weight:600; font-size:13px; color:#0284c7;">Clics Humanos Reales</label>
+          <input id="edit_raw_clicks" name="clicks_count" type="number" min="0" placeholder="6124">
+        </div>
+        <div>
+          <label style="font-weight:600; font-size:13px;">Tasa de Clic % (ej. 5.1)</label>
+          <input id="edit_clicks" name="click_rate" type="number" step="0.1" min="0" placeholder="5.1">
         </div>
       </div>
 
@@ -677,18 +683,20 @@ var weeklyOutreachMap = {
       instantly: {{ w.outreach_emails_instantly }},
       sms: {{ w.outreach_sms }},
       opens: {{ w.opens_count }},
+      raw_clicks: {{ w.clicks_count or 0 }},
       clicks: {{ w.click_rate }}
     },
   {% endfor %}
 };
 
-function openEditOutreachModal(weekNum, weekLabel, dateRange, cc, instantly, sms, opens, clicks) {
+function openEditOutreachModal(weekNum, weekLabel, dateRange, cc, instantly, sms, opens, rawClicks, clicks) {
   var sel = document.getElementById('edit_outreach_week');
   if (sel) sel.value = weekNum;
   document.getElementById('edit_cc').value = cc !== undefined ? cc : 0;
   document.getElementById('edit_instantly').value = instantly !== undefined ? instantly : 0;
   document.getElementById('edit_sms').value = sms !== undefined ? sms : 0;
   document.getElementById('edit_opens').value = opens !== undefined ? opens : 0;
+  document.getElementById('edit_raw_clicks').value = rawClicks !== undefined ? rawClicks : 0;
   document.getElementById('edit_clicks').value = clicks !== undefined ? clicks : 0;
   openModal('editOutreachModal');
 }
@@ -700,6 +708,7 @@ function onWeekSelectChange(weekNum) {
     document.getElementById('edit_instantly').value = d.instantly;
     document.getElementById('edit_sms').value = d.sms;
     document.getElementById('edit_opens').value = d.opens;
+    document.getElementById('edit_raw_clicks').value = d.raw_clicks;
     document.getElementById('edit_clicks').value = d.clicks;
   }
 }
