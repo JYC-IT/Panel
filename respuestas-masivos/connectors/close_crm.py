@@ -11,7 +11,7 @@ load_dotenv(os.path.join(root_dir, ".env"), override=True)
 BASE_URL = "https://api.close.com/api/v1"
 KP_OUTCOME_ID = "outcome_033WrVULhq3NJjJSQLPgxg"
 KP_METRIC_KEY = f"outcome.{KP_OUTCOME_ID}.count"
-CALLS_METRIC_KEY = "calls.all.all.count"
+CALLS_METRIC_KEY = "calls.outbound.all.count"
 
 # Asesores comerciales del equipo JYC activos (8 asesores seleccionados)
 DEFAULT_AGENT_EMAILS = [

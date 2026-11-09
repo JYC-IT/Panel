@@ -111,9 +111,9 @@ En Close CRM, un **KP** se computa exclusivamente con el Outcome:
 ## 5. Histórico Consolidado Reciente
 
 ### Semana 27* (Nov 2 - 6) - Datos Oficiales Guardados:
-* **Llamadas del Equipo:** **703** (AM: 255 | PM: 448)
+* **Llamadas Salientes del Equipo:** **622** (AM: 238 | PM: 384)
 * **KPs Logrados:** **56**
-* **Efectividad Comercial:** **7.97%**
+* **Efectividad Comercial:** **9.00%**
 * **Outreach Masivo:**
   * Constant Contact: **119,222**
   * Instantly: **317**
