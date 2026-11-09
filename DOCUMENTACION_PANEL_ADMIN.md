@@ -87,18 +87,20 @@ Desglose individual por asesor para cada semana:
 
 ## 4. Reglas de Negocio del Equipo Comercial (Close CRM)
 
-### Asesores Comerciales Activos Autorizados (6 Integrantes):
-1. **Mariana Polanco** (`mpolanco@jycexports.com`)
-2. **Hernán Bonilla** (`hbonilla@jycexports.com`)
-3. **Roy Jones** (`rjones@jycexports.com` / `royjones@jycexports.com`)
-4. **Julián Prado** (`jp@jycmedical.com`)
-5. **Sebastián Jordan** (`sjordan@jycmachinery.com`)
-6. **Juan Córdoba** (`jcordoba@jycexports.com`)
+### Asesores Comerciales Activos Autorizados (8 Integrantes):
+1. **Hernán Bonilla** (`hbonilla@jycexports.com`)
+2. **Juan Abuchaibe** (`solutions@jycexports.com`)
+3. **Juan Arango** (`plastics@jycmachinery.com`)
+4. **Juan Córdoba** (`jcordoba@jycexports.com`)
+5. **Julián Prado** (`jp@jycmedical.com`)
+6. **Mariana Polanco** (`mpolanco@jycexports.com`)
+7. **Roy Jones** (`rjones@jycexports.com` / `royjones@jycexports.com`)
+8. **Sebastián Jordan** (`sjordan@jycmachinery.com`)
 
 ### Personal Excluido de Reportes Comerciales:
-* **Rod Vélez** (desvinculado de la empresa).
-* **Juan Carlos Abuchaibe** (no forma parte del cómputo de KPIs comerciales).
 * **Carlos Córdoba** (no incluido en reportes de llamadas salientes).
+* **Rod Vélez** (desvinculado de la empresa).
+* **Support Team** (buzón de soporte técnico).
 
 ### Definición de KP (Key Person):
 En Close CRM, un **KP** se computa exclusivamente con el Outcome:
@@ -107,6 +109,19 @@ En Close CRM, un **KP** se computa exclusivamente con el Outcome:
 ---
 
 ## 5. Histórico Consolidado Reciente
+
+### Semana 27* (Nov 2 - 6) - Datos Oficiales Guardados:
+* **Llamadas del Equipo:** **622** (AM: 238 | PM: 384)
+* **KPs Logrados:** **56**
+* **Efectividad Comercial:** **9.00%**
+* **Outreach Masivo:**
+  * Constant Contact: **119,222**
+  * Instantly: **317**
+  * Launch Control (SMS): **0**
+  * **Total Outreach:** **119,539**
+  * Aperturas: **38,665**
+  * Clics: **6,124** (Click Rate: 5.12%)
+* **Notas de la semana:** `""`
 
 ### Semana 26* (Oct 26 - 30) - Datos Oficiales Guardados:
 * **Llamadas del Equipo:** **656** (AM: 373 | PM: 283)

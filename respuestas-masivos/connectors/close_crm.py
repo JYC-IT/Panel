@@ -13,28 +13,30 @@ KP_OUTCOME_ID = "outcome_033WrVULhq3NJjJSQLPgxg"
 KP_METRIC_KEY = f"outcome.{KP_OUTCOME_ID}.count"
 CALLS_METRIC_KEY = "calls.outbound.all.count"
 
-# Asesores comerciales del equipo JYC activos
+# Asesores comerciales del equipo JYC activos (8 asesores seleccionados)
 DEFAULT_AGENT_EMAILS = [
     "hbonilla@jycexports.com",     # Hernán Bonilla
-    "mpolanco@jycexports.com",     # Mariana Polanco
-    "sjordan@jycmachinery.com",    # Sebastián Jordan
+    "solutions@jycexports.com",    # Juan Abuchaibe
+    "plastics@jycmachinery.com",   # Juan Arango
+    "jcordoba@jycexports.com",     # Juan Córdoba
     "jp@jycmedical.com",           # Julián Prado
+    "mpolanco@jycexports.com",     # Mariana Polanco
     "rjones@jycexports.com",       # Roy Jones
     "royjones@jycexports.com",     # Roy Jones (alias)
-    "jcordoba@jycexports.com",     # Juan Córdoba
+    "sjordan@jycmachinery.com",    # Sebastián Jordan
 ]
 
-# Usuarios inactivos o desvinculados que deben excluirse de reportes y auditorías
+# Usuarios inactivos o no comerciales que deben excluirse de reportes
 EXCLUDED_EMAILS = {
     "rvelez@jycmedical.com",       # Rod Vélez (desvinculado)
-    "solutions@jycexports.com",    # Juan Carlos Abuchaibe (no cuenta)
     "ccordoba@jycexports.com",     # Carlos Córdoba
     "ccordoba@equipmentjyc.com",
+    "support@jycequipment.com",    # Support Team
 }
 EXCLUDED_USER_IDS = {
     "user_BWRW97kwcx8bFi9OPYzTKzlJfba7EoDV2XPdh3Fw0DI",  # Rod Vélez
-    "user_7cXDrv9AKnoVTSOnXBJo2oYXmUrFRDG40sIYVhmDwHA",  # Juan Carlos Abuchaibe
     "user_Aa5pIAD0HQvnxk1hAMdvdBz3UAjW1NaVrKFMfJpmpaK",  # Carlos Córdoba
+    "user_7Y6Tfhygn7yAtVJDXuloX19dCquniSIWPdUkqWKjehP",  # Support Team
 }
 
 
