@@ -77,17 +77,16 @@ def exchange_code_for_tokens(code: str, redirect_uri: str):
     if not client_id or not client_secret:
         raise ValueError("Falta CONSTANT_CONTACT_CLIENT_ID o CONSTANT_CONTACT_CLIENT_SECRET en .env")
 
-    session = get_session()
-    r = session.post(
+    r = requests.post(
         "https://authz.constantcontact.com/oauth2/default/v1/token",
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "JYC-PanelAdmin/1.0"},
         auth=(client_id, client_secret),
         data={
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirect_uri
         },
-        timeout=15
+        timeout=20
     )
     r.raise_for_status()
     data = r.json()
@@ -111,16 +110,15 @@ def get_access_token():
     # Si hay credenciales OAuth para renovar
     if refresh_token and client_id and client_secret:
         try:
-            session = get_session()
-            r = session.post(
+            r = requests.post(
                 "https://authz.constantcontact.com/oauth2/default/v1/token",
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                headers={"Content-Type": "application/x-www-form-urlencoded", "User-Agent": "JYC-PanelAdmin/1.0"},
                 auth=(client_id, client_secret),
                 data={
                     "grant_type": "refresh_token",
                     "refresh_token": refresh_token
                 },
-                timeout=15
+                timeout=20
             )
             if r.status_code == 200:
                 data = r.json()

@@ -115,12 +115,12 @@ En Close CRM, un **KP** se computa exclusivamente con el Outcome:
 * **KPs Logrados:** **56**
 * **Efectividad Comercial:** **9.00%**
 * **Outreach Masivo:**
-  * Constant Contact: **119,222**
+  * Constant Contact: **169,842** (5 campañas enviadas)
   * Instantly: **317**
   * Launch Control (SMS): **0**
-  * **Total Outreach:** **119,539**
-  * Aperturas: **38,665**
-  * Clics: **6,124** (Click Rate: 5.12%)
+  * **Total Outreach:** **170,159**
+  * Aperturas Reportadas: **76,476** (incluye proxy-opens de Apple)
+  * Clics Humanos Únicos: **7,361** (CC) / **7,409** (Total)
 * **Notas de la semana:** `""`
 
 ### Semana 26* (Oct 26 - 30) - Datos Oficiales Guardados:
