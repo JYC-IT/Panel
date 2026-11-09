@@ -119,9 +119,9 @@ En Close CRM, un **KP** se computa exclusivamente con el Outcome:
   * Instantly: **317**
   * Launch Control (SMS): **0**
   * **Total Outreach:** **170,159**
-  * Aperturas Reportadas: **76,476** (incluye proxy-opens de Apple)
-  * Clics Humanos Únicos: **7,361** (CC) / **7,409** (Total)
-* **Notas de la semana:** `"+10 EKP (KPs por Email)"`
+  * Aperturas Humanas Reales (Sin Bots): **32,596** (32,477 CC + 119 Instantly)
+  * Clics Humanos Únicos Confirmados: **7,361** (CC) / **7,409** (Total)
+* **Notas de la semana:** `"+10 EKP - Opens reales humanos sin bots"`
 
 ### Semana 26* (Oct 26 - 30) - Datos Oficiales Guardados:
 * **Llamadas del Equipo:** **656** (AM: 373 | PM: 283)
