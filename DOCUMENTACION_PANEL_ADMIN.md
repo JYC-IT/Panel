@@ -112,8 +112,8 @@ En Close CRM, un **KP** se computa exclusivamente con el Outcome:
 
 ### Semana 27* (Nov 2 - 6) - Datos Oficiales Guardados:
 * **Llamadas Salientes del Equipo:** **622** (AM: 238 | PM: 384)
-* **KPs Logrados:** **56**
-* **Efectividad Comercial:** **9.00%**
+* **KPs Logrados:** **66** (56 por llamadas Close CRM + 10 por Email `#EKP`)
+* **Efectividad Comercial:** **10.61%**
 * **Outreach Masivo:**
   * Constant Contact: **169,842** (5 campañas enviadas)
   * Instantly: **317**
@@ -121,7 +121,7 @@ En Close CRM, un **KP** se computa exclusivamente con el Outcome:
   * **Total Outreach:** **170,159**
   * Aperturas Reportadas: **76,476** (incluye proxy-opens de Apple)
   * Clics Humanos Únicos: **7,361** (CC) / **7,409** (Total)
-* **Notas de la semana:** `""`
+* **Notas de la semana:** `"+10 EKP (KPs por Email)"`
 
 ### Semana 26* (Oct 26 - 30) - Datos Oficiales Guardados:
 * **Llamadas del Equipo:** **656** (AM: 373 | PM: 283)
