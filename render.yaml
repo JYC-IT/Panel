@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: panel-admin
+    runtime: python
+    rootDir: respuestas-masivos
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT "app:create_app()"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CLOSE_CRM_API_KEY
+        sync: false
+      - key: INSTANTLY_API_KEY
+        sync: false
+      - key: CONSTANT_CONTACT_CLIENT_ID
+        sync: false
+      - key: CONSTANT_CONTACT_CLIENT_SECRET
+        sync: false
+      - key: CONSTANT_CONTACT_ACCESS_TOKEN
+        sync: false
+      - key: CONSTANT_CONTACT_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      - key: SYNC_INTERVAL_MINUTES
+        value: "30"
+      - key: LOOKBACK_DAYS
+        value: "30"
