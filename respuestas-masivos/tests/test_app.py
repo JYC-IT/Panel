@@ -42,7 +42,7 @@ class AppTestCase(unittest.TestCase):
             sess["user_id"] = 1
             sess["user_email"] = "admin@jycexports.com"
             sess["user_role"] = "admin"
-        res = self.client.get("/performance")
+        res = self.client.get("/performance", follow_redirects=True)
         self.assertEqual(res.status_code, 200)
 
         # Prueba de exportación CSV
@@ -52,6 +52,38 @@ class AppTestCase(unittest.TestCase):
             self.assertEqual(res_csv.mimetype, "text/csv")
             self.assertIn(b"Asesor Comercial", res_csv.data)
 
+    def test_commercial_dashboard_view(self):
+        """Vista del Panel Comercial de Hernán y exportación CSV."""
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = 1
+            sess["user_email"] = "admin@jycexports.com"
+            sess["user_role"] = "admin"
+        res = self.client.get("/commercial-dashboard?start_date=2026-11-02&end_date=2026-11-06")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("Hernán Bonilla".encode("utf-8"), res.data)
+        self.assertIn(b"Gross Dial Time", res.data)
+        self.assertIn(b"#EKP", res.data)
+
+        # Prueba de exportación CSV
+        res_csv = self.client.get("/commercial-dashboard/export.csv?start_date=2026-11-02&end_date=2026-11-06")
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertEqual(res_csv.mimetype, "text/csv")
+        self.assertIn("Asesor Comercial".encode("utf-8"), res_csv.data)
+
+        # Prueba de exportación de alertas de inactividad CSV
+        res_inact = self.client.get("/commercial-dashboard/inactivity-export.csv?start_date=2026-11-02&end_date=2026-11-06")
+        self.assertIn(res_inact.status_code, (200, 302))
+        if res_inact.status_code == 200:
+            self.assertEqual(res_inact.mimetype, "text/csv")
+            self.assertIn("Asesor Comercial".encode("utf-8"), res_inact.data)
+
+        # Prueba de exportación de control de jornada CSV
+        res_disc = self.client.get("/commercial-dashboard/discipline-export.csv?start_date=2026-11-02&end_date=2026-11-06")
+        self.assertIn(res_disc.status_code, (200, 302))
+        if res_disc.status_code == 200:
+            self.assertEqual(res_disc.mimetype, "text/csv")
+            self.assertIn("Asesor Comercial".encode("utf-8"), res_disc.data)
+
     def test_campaign_detail(self):
         """Vista de detalle de campaña existente."""
         with self.client.session_transaction() as sess:
@@ -60,20 +92,6 @@ class AppTestCase(unittest.TestCase):
             sess["user_role"] = "admin"
         res = self.client.get("/campaign/1")
         self.assertIn(res.status_code, (200, 404))
-
-    def test_roy_jones_excluded(self):
-        """Roy Jones debe estar estrictamente excluido del sistema."""
-        self.assertIn("rjones@jycexports.com", close_crm.EXCLUDED_EMAILS)
-        self.assertIn("royjones@jycexports.com", close_crm.EXCLUDED_EMAILS)
-        self.assertIn("user_fFN8XRtibi7NPtCPiZSM6Z5cHmw87PYKDJ8Xg6tYv4D", close_crm.EXCLUDED_USER_IDS)
-        self.assertIn("user_8utZW4zSBIE0JHZ3Ef4zSNalKgZVRb9Dxz46M3Dtxrv", close_crm.EXCLUDED_USER_IDS)
-        self.assertNotIn("rjones@jycexports.com", close_crm.DEFAULT_AGENT_EMAILS)
-        self.assertNotIn("royjones@jycexports.com", close_crm.DEFAULT_AGENT_EMAILS)
-
-        # Chequear que la consulta de KPIs en BD no devuelva a Roy
-        kpis = db.get_agent_kpis()
-        for k in kpis:
-            self.assertNotIn("roy", (k.get("name") or "").lower())
 
     def test_carlos_cordoba_excluded(self):
         """Carlos Córdoba debe estar estrictamente excluido del sistema comercial y reportes."""

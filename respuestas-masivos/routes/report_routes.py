@@ -8,34 +8,42 @@ from services import report_performance
 
 def register_report_routes(app):
     @app.route("/performance")
+    @auth.login_required
     def performance_view():
-        start_date = request.args.get("start_date")
-        end_date = request.args.get("end_date")
-        report = report_performance.get_performance_report(start_date, end_date)
+        if request.args.get("view") == "classic":
+            start_date = request.args.get("start_date")
+            end_date = request.args.get("end_date")
+            report = report_performance.get_performance_report(start_date, end_date)
 
-        from datetime import date, timedelta
-        today = date.today()
-        presets = {
-            "last_7": {"start": (today - timedelta(days=7)).isoformat(), "end": today.isoformat(), "label": "7 días"},
-            "last_30": {"start": (today - timedelta(days=30)).isoformat(), "end": today.isoformat(), "label": "30 días"},
-            "this_month": {"start": today.replace(day=1).isoformat(), "end": today.isoformat(), "label": "Este Mes"},
-            "last_month": {
-                "start": (today.replace(day=1) - timedelta(days=1)).replace(day=1).isoformat(),
-                "end": (today.replace(day=1) - timedelta(days=1)).isoformat(),
-                "label": "Mes Anterior"
+            from datetime import date, timedelta
+            today = date.today()
+            presets = {
+                "last_7": {"start": (today - timedelta(days=7)).isoformat(), "end": today.isoformat(), "label": "7 días"},
+                "last_30": {"start": (today - timedelta(days=30)).isoformat(), "end": today.isoformat(), "label": "30 días"},
+                "this_month": {"start": today.replace(day=1).isoformat(), "end": today.isoformat(), "label": "Este Mes"},
+                "last_month": {
+                    "start": (today.replace(day=1) - timedelta(days=1)).replace(day=1).isoformat(),
+                    "end": (today.replace(day=1) - timedelta(days=1)).isoformat(),
+                    "label": "Mes Anterior"
+                }
             }
-        }
 
-        return render_template(
-            "performance.html",
-            report=report,
-            presets=presets,
-            active_page="performance"
-        )
+            return render_template(
+                "performance.html",
+                report=report,
+                presets=presets,
+                active_page="performance"
+            )
+
+        # Por defecto redirige al nuevo panel comercial requerido por Hernán
+        return redirect(url_for("commercial_dashboard_view", **request.args))
 
     @app.route("/performance/export.csv")
+    @auth.login_required
     def export_performance_csv():
         """Exporta el reporte analítico comercial a formato CSV ejecutivo."""
+        if request.args.get("view") != "classic":
+            return redirect(url_for("export_commercial_csv", **request.args))
         import csv
         import io
         from flask import Response

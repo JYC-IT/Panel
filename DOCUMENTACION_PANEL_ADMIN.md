@@ -33,15 +33,18 @@ PanelAdmin/
     ├── routes/                     # Controladores y endpoints web
     │   ├── campaign_routes.py      # Métricas de campañas masivas y listado de respuestas
     │   ├── report_routes.py        # Reporte semanal de resultados y sincronización con Close CRM
+    │   ├── commercial_routes.py    # Panel de control comercial Hernán (metas diarias, KPs, llamadas, opps, tareas)
     │   ├── audit_routes.py         # Auditoría comercial de llamadas y reproductor de audio
     │   ├── auth_routes.py          # Login, logout y gestión de sesión
     │   └── error_routes.py         # Manejadores de error (404, 500)
     ├── services/                   # Lógica de negocio
     │   ├── audit_engine.py         # Motor de análisis y auditoría de llamadas en Close CRM
+    │   ├── commercial_dashboard.py # Motor analítico de metas diarias y KPIs de comerciales (Hernán)
     │   ├── report_performance.py   # Cálculos de rendimiento y KPIs comerciales
     │   └── sync_service.py         # Tareas periódicas de sincronización en segundo plano
     ├── templates/                  # Vistas HTML (Jinja2)
     │   ├── base.html               # Layout maestro y navegación ejecutiva
+    │   ├── commercial_dashboard.html # Panel comercial Hernán (KPs, llamadas, metas diarias, opps, tareas)
     │   ├── index.html              # Dashboard general de campañas masivas
     │   ├── weekly_report.html      # Reporte ejecutivo semanal (gráficas y tablas históricas)
     │   ├── performance.html        # Métricas de rendimiento individual y del equipo
@@ -102,9 +105,35 @@ Desglose individual por asesor para cada semana:
 * **Rod Vélez** (desvinculado de la empresa).
 * **Support Team** (buzón de soporte técnico).
 
-### Definición de KP (Key Person):
-En Close CRM, un **KP** se computa exclusivamente con el Outcome:
-`TALKED TO KP – NEEDS NEXT STEP` (ID: `outcome_033WrVULhq3NJjJSQLPgxg`).
+### Definición de KP (Key Person) y Metas Diarias:
+* **Live KP Talk (Llamadas):** Outcome oficial `TALKED TO KP – NEEDS NEXT STEP` (`outcome_033WrVULhq3NJjJSQLPgxg`).
+* **#EKP (Email KP):** Contactos clave logrados mediante intercambio de correos electrónicos, identificados con el hashtag `#EKP` en las notas o registros de Close CRM.
+* **#TKP (Text KP):** Contactos clave logrados vía SMS/Chat/WhatsApp, identificados con el hashtag `#TKP`.
+* **Total KPs:** $\text{Live KP Talk} + \text{EKP} + \text{TKP}$.
+* **Metas Diarias Obligatorias fijadas por Hernán:**
+  1. **Llamadas Diarias Mínimas:** Mínimo **60 llamadas al día** por asesor.
+  2. **KPs Diarios Mínimos:** Mínimo **10 KPs diarios** por asesor.
+  3. **Composición de KPs:** La mitad de los KPs diarios (mínimo **5**) deben ser llamadas directas (*Live KP Talk*).
+* **Métricas Adicionales de Monitoreo:**
+  * **Gross Dial Time:** Tiempo bruto total en llamada telefónica (horas y minutos acumulados).
+  * **Emails Enviados:** Correos 1-a-1 salientes enviados por cada comercial.
+  * **Oportunidades Creadas:** Total de oportunidades creadas en el periodo, clasificadas entre el Pipeline de Ventas (*Sell*, `pipe_2g0VCRFwavbPI4whagZads`) y el Pipeline de Compras (*Purchase*, `pipe_3BxoKZTZl7XgFpE3YpVQJr`).
+  * **Tareas:** Tareas creadas (*Set*) vs. tareas completadas (*Done*).
+  * **Alertas de Inactividad (&ge; 30 min entre llamadas):** Auditoría en tiempo real del tiempo transcurrido desde que un asesor finaliza una llamada (`hora_fin = hora_inicio + duracion`) hasta que inicia la siguiente llamada del mismo día laboral.
+
+---
+
+## 4.1. Panel Comercial de Hernán (`/commercial-dashboard` o `/comerciales`)
+Módulo independiente en la barra de navegación lateral ("Dirección Comercial" -> "Panel Comerciales (Hernán)"):
+* Filtros rápidos por fecha: **Hoy**, **Ayer**, **Esta Semana**, **Semana Pasada**, **Este Mes** o Rango Personalizado.
+* Cálculo automático de días hábiles del periodo seleccionado para proyectar las metas acumuladas de llamadas y KPs.
+* Tabla comparativa con semaforización de cumplimiento (🟢 Cumple Metas, 🟡 Parcial, 🔴 Bajo Meta).
+* **Columna y Tarjeta de Inactividad (&gt;30m):** Conteo de pausas por asesor, tiempo máximo de pausa y distinción de pausas efectivas de trabajo descontando automáticamente el descanso de almuerzo continuo (11:50 AM a 1:00 PM) y la pausa de la tarde (2:35 PM a 2:45 PM).
+* **Módulo Completo de Auditoría de Inactividad:** Registro detallado de cada pausa &ge; 30 min indicando: asesor, duración laboral efectiva, minutos totales de reloj, tiempo descontado oficial (-1h 10m almuerzo o -10m pausa), horario (de/hasta), severidad (🚨 Crítica &gt;1h, ⚠️ Pausa Larga &gt;30m), y los leads/teléfonos de la llamada previa y de la siguiente llamada.
+* Desglose auditor de notas registradas con `#EKP` y `#TKP` con acceso al texto ingresado y empresa/lead.
+* Desglose de oportunidades creadas con lead, pipeline y valor monetario.
+* Exportación directa a CSV para dirección comercial (`/commercial-dashboard/export.csv`).
+* Exportación dedicada de alertas de inactividad a CSV (`/commercial-dashboard/inactivity-export.csv`).
 
 ---
 
