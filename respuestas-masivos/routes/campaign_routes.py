@@ -230,8 +230,9 @@ def register_campaign_routes(app):
             flash("Configura CONSTANT_CONTACT_CLIENT_ID en tu archivo .env para conectar con 1 clic.", "error")
             return redirect(url_for("index"))
 
+        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
         host_header = request.host
-        redirect_uri = f"http://{host_header}/callback/constantcontact"
+        redirect_uri = f"{scheme}://{host_header}/callback/constantcontact"
         scope = "campaign_data offline_access"
         state_token = "cc_auth_state_secure_123"
         auth_url = (
@@ -255,7 +256,8 @@ def register_campaign_routes(app):
             flash("No se recibió código de autorización de Constant Contact.", "error")
             return redirect(url_for("index"))
 
-        redirect_uri = f"http://{request.host}/callback/constantcontact"
+        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+        redirect_uri = f"{scheme}://{request.host}/callback/constantcontact"
         try:
             constantcontact.exchange_code_for_tokens(code, redirect_uri)
             # Sincronización en segundo plano para respuesta instantánea (< 1 segundo)

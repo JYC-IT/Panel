@@ -315,11 +315,17 @@ def run_all():
     return messages
 
 
+_scheduler_started = False
+
 def start_scheduler():
     """Hilo en segundo plano que sincroniza cada SYNC_INTERVAL_MINUTES."""
+    global _scheduler_started
+    if _scheduler_started:
+        return
     minutes = int(_cfg("SYNC_INTERVAL_MINUTES", "15"))
     if minutes <= 0:
         return
+    _scheduler_started = True
     stop = threading.Event()
 
     def loop():

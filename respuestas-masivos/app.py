@@ -29,6 +29,9 @@ def create_app():
     auth.init_app(application)
     register_all_routes(application)
 
+    # Iniciar sincronizador automático en segundo plano (para Gunicorn en Render y local)
+    sync.start_scheduler()
+
     return application
 
 
