@@ -621,7 +621,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         diff_m = int((f_am_dt - entry_dt).total_seconds() / 60)
                         if diff_m <= 10:
                             f_am_status = "ok"
-                            f_am_label = "✓ A tiempo"
+                            f_am_label = "A tiempo"
                             f_am_color = "#059669"
                         elif diff_m <= 30:
                             f_am_status = "warning"
@@ -642,7 +642,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         l_am_time = l_am_dt.strftime("%I:%M %p")
                         if l_am_dt >= lunch_dt - timedelta(minutes=15):
                             l_am_status = "ok"
-                            l_am_label = "✓ Hasta almuerzo"
+                            l_am_label = "Hasta almuerzo"
                             l_am_color = "#059669"
                             early_m = 0
                         else:
@@ -667,7 +667,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         diff_pm = int((f_pm_dt - ret_dt).total_seconds() / 60)
                         if diff_pm <= 15:
                             f_pm_status = "ok"
-                            f_pm_label = "✓ A tiempo"
+                            f_pm_label = "A tiempo"
                             f_pm_color = "#059669"
                         elif diff_pm <= 30:
                             f_pm_status = "warning"
@@ -691,7 +691,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         l_pm_time = l_pm_dt.strftime("%I:%M %p")
                         if l_pm_dt >= exit_dt - timedelta(minutes=15):
                             l_pm_status = "ok"
-                            l_pm_label = "✓ Salida normal"
+                            l_pm_label = "Salida normal"
                             l_pm_color = "#059669"
                             early_exit = 0
                         else:
