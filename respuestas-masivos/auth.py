@@ -99,18 +99,31 @@ def verify(username, password):
 
 
 def bootstrap_admin():
-    """Si no hay ningún usuario, crea el admin inicial desde ADMIN_USERNAME / ADMIN_PASSWORD del .env."""
+    """Garantiza la inicialización automática de los usuarios oficiales en Render y producción."""
     with db.get_conn() as conn:
-        count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    if count:
-        return
-    username = os.getenv("ADMIN_USERNAME", "").strip()
-    password = os.getenv("ADMIN_PASSWORD", "").strip()
-    if username and password:
-        create_user(username, os.getenv("ADMIN_NAME", username), password, "admin")
-        print(f"  Usuario admin «{username}» creado desde el .env")
-    else:
-        print("  ⚠️  No hay usuarios. Crea el admin con:  python crear_usuario.py")
+        # 1. Francisco (Administrador)
+        f_row = conn.execute("SELECT id FROM users WHERE username = 'francisco'").fetchone()
+        if not f_row:
+            create_user("francisco", "Francisco", "Jyc2026*Admin", "admin")
+            print("  Usuario admin «francisco» inicializado.")
+        else:
+            set_password(f_row["id"], "Jyc2026*Admin")
+
+        # 2. Hernan (Lector)
+        h_row = conn.execute("SELECT id FROM users WHERE username = 'hernan'").fetchone()
+        if not h_row:
+            create_user("hernan", "Hernán", "Jyc2026*Hernan", "lector")
+            print("  Usuario lector «hernan» inicializado.")
+        else:
+            set_password(h_row["id"], "Jyc2026*Hernan")
+
+        # 3. Soporte opcional desde variables de entorno si se configuran
+        env_user = os.getenv("ADMIN_USERNAME", "").strip()
+        env_pass = os.getenv("ADMIN_PASSWORD", "").strip()
+        if env_user and env_pass:
+            e_row = conn.execute("SELECT id FROM users WHERE username = ?", (env_user,)).fetchone()
+            if not e_row:
+                create_user(env_user, os.getenv("ADMIN_NAME", env_user), env_pass, "admin")
 
 
 def init_app(app):
