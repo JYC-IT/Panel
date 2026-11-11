@@ -155,6 +155,21 @@ def init_db():
                 cached_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ai_verifications (
+                activity_id TEXT PRIMARY KEY,
+                activity_type TEXT NOT NULL,
+                user_id TEXT,
+                verdict TEXT NOT NULL,
+                category TEXT,
+                score INTEGER DEFAULT 0,
+                reason TEXT,
+                evidence TEXT,
+                summary TEXT,
+                model_used TEXT,
+                analyzed_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_cid ON replies(campaign_id, is_auto)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_intent ON replies(campaign_id, intent)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_campaigns_source_sent ON campaigns(source, sent_count)")

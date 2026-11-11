@@ -126,8 +126,11 @@ def register_commercial_routes(app):
             "Meta KP Llamadas Periodo",
             "% Cumpl. KP Llamadas",
             "Estado Metas",
-            "Alertas Inactividad (>30m)",
-            "Pausa Maxima Inactiva"
+            "Alertas Inactividad (>=10m)",
+            "Pausa Maxima Inactiva",
+            "Live KP Verificados IA",
+            "EKP Verificados IA",
+            "TKP Verificados IA"
         ])
 
         summary = data["summary"]
@@ -161,7 +164,10 @@ def register_commercial_routes(app):
                 f"{c['call_kps_pct']}%",
                 c["status_goal"],
                 c.get("inactivity_count", 0),
-                c.get("inactivity_max_human", "-")
+                c.get("inactivity_max_human", "-"),
+                c.get("live_kp_verified", 0),
+                c.get("ekp_verified", 0),
+                c.get("tkp_verified", 0),
             ])
 
         output.seek(0)
@@ -303,6 +309,78 @@ def register_commercial_routes(app):
 
         output.seek(0)
         filename = f"control_horarios_jornada_{start_date}_{end_date}.csv"
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    @app.route("/commercial-dashboard/ai-audit-export.csv")
+    @auth.login_required
+    def export_ai_audit_csv():
+        today_iso = date.today().isoformat()
+        start_date = request.args.get("start_date") or today_iso
+        end_date = request.args.get("end_date") or today_iso
+
+        data = commercial_dashboard.get_commercial_dashboard_data(
+            start_date=start_date,
+            end_date=end_date
+        )
+
+        call_audits = data.get("ai_call_audits", []) if data else []
+        tag_audits = data.get("ai_tag_audits", []) if data else []
+        if not call_audits and not tag_audits:
+            flash("No hay registros de auditoria IA en este periodo.", "info")
+            return redirect(url_for("commercial_dashboard_view", start_date=start_date, end_date=end_date))
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "Tipo Auditoria",
+            "Asesor Comercial",
+            "Lead",
+            "Fecha",
+            "Duracion (seg)",
+            "Veredicto IA",
+            "Categoria",
+            "Puntaje (0-100)",
+            "Motivo / Analisis",
+            "Evidencia CRM / Notetaker",
+            "Motor"
+        ])
+
+        for c in call_audits:
+            writer.writerow([
+                "Talked to KP (Llamada)",
+                c.get("user_name", ""),
+                c.get("lead_name", c.get("lead_id", "")),
+                c.get("date", ""),
+                c.get("duration", 0),
+                c.get("verdict", ""),
+                c.get("category", ""),
+                c.get("score", 0),
+                c.get("reason", ""),
+                c.get("summary") or c.get("evidence", ""),
+                c.get("model_used", ""),
+            ])
+
+        for t in tag_audits:
+            writer.writerow([
+                f"#{t.get('type', 'KP')} (Nota)",
+                t.get("user_name", ""),
+                t.get("lead_name", t.get("lead_id", "")),
+                t.get("date", ""),
+                "-",
+                t.get("verdict", ""),
+                t.get("category", ""),
+                t.get("score", 0),
+                t.get("reason", ""),
+                t.get("evidence") or t.get("text", ""),
+                t.get("model_used", ""),
+            ])
+
+        output.seek(0)
+        filename = f"auditoria_ia_kp_{start_date}_{end_date}.csv"
         return Response(
             output.getvalue(),
             mimetype="text/csv; charset=utf-8",

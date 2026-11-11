@@ -84,7 +84,7 @@
         <strong>KPI Tags:</strong> #EKP (Email KP) & #TKP (Text KP)
       </span>
       <span class="badge" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-size: 12px; padding: 4px 10px;">
-        <strong>Alerta Inactividad:</strong> Pausas ≥ 30 min entre llamadas
+        <strong>Alerta Inactividad:</strong> Pausas ≥ 10 min entre llamadas
       </span>
     </div>
     <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">
@@ -198,7 +198,7 @@
   <!-- Tarjeta 7: Pausas > 30 Minutos -->
   <div class="kpi-card" style="border-left: 4px solid #f43f5e;">
     <div class="kpi-header">
-      <span class="kpi-label" style="color: #be123c;">Pausas &gt; 30 Minutos</span>
+      <span class="kpi-label" style="color: #be123c;">Pausas ≥ 10 Minutos</span>
       <div class="kpi-icon-bubble" style="background: rgba(244, 63, 94, 0.1); color: #e11d48;">
         <svg style="width: 16px; height: 16px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -258,7 +258,7 @@
           <th style="padding: 12px 14px; text-align: left; font-weight: 800; color: #1e293b; min-width: 245px;">Control de Jornada<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">1ra y Última (Mañana / Tarde)</span></th>
           <th style="padding: 12px 14px; text-align: center; font-weight: 800; color: var(--text-main);">Total Calls<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">Out / In</span></th>
           <th style="padding: 12px 14px; text-align: center; font-weight: 800; color: var(--text-main);">Gross Dial<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">Time</span></th>
-          <th style="padding: 12px 14px; text-align: center; font-weight: 800; color: #be123c; background: rgba(244, 63, 94, 0.05);">Pausas &gt;30m<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">Inactividad</span></th>
+          <th style="padding: 12px 14px; text-align: center; font-weight: 800; color: #be123c; background: rgba(244, 63, 94, 0.05);">Pausas &ge;10m<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">Inactividad</span></th>
           <th style="padding: 12px 14px; text-align: center; font-weight: 800; color: #0284c7; background: rgba(14, 165, 233, 0.05);">Live KP Talk<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">Llamadas</span></th>
           <th style="padding: 12px 14px; text-align: center; font-weight: 800; color: #7c3aed; background: rgba(124, 58, 237, 0.05);">#EKP<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">Email KP</span></th>
           <th style="padding: 12px 14px; text-align: center; font-weight: 800; color: #d97706; background: rgba(217, 119, 6, 0.05);">#TKP<br><span style="font-size: 10.5px; font-weight: 600; color: var(--text-secondary);">Text KP</span></th>
@@ -373,7 +373,7 @@
             </div>
           </td>
 
-          <!-- Inactividad (> 30m) -->
+          <!-- Inactividad (>= 10m) -->
           <td style="padding: 12px 14px; text-align: center; vertical-align: middle; background: rgba(244, 63, 94, 0.02);">
             {% if c.inactivity_count == 0 %}
               <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 11px; font-weight: 800;">
@@ -397,6 +397,11 @@
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
               {{ c.effectiveness }}% efect.
             </div>
+            {% if c.live_kp > 0 %}
+            <div style="font-size: 10px; font-weight: 700; margin-top: 2px; color: {% if c.live_kp_verified == c.live_kp %}#059669{% elif c.live_kp_invalid > 0 %}#b91c1c{% else %}#b45309{% endif %};">
+              IA: {{ c.live_kp_verified }}/{{ c.live_kp }} OK
+            </div>
+            {% endif %}
             <div style="margin-top: 4px; font-size: 10.5px;">
               <span style="color: {% if c.met_call_kps %}#059669{% else %}#dc2626{% endif %}; font-weight: 700;">
                 {{ c.call_kps_pct }}%
@@ -413,6 +418,11 @@
             <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
               #EKP
             </div>
+            {% if c.ekp > 0 %}
+            <div style="font-size: 10px; font-weight: 700; margin-top: 2px; color: {% if c.ekp_verified == c.ekp %}#059669{% else %}#b45309{% endif %};">
+              IA: {{ c.ekp_verified }}/{{ c.ekp }} OK
+            </div>
+            {% endif %}
           </td>
 
           <!-- #TKP -->
@@ -423,6 +433,11 @@
             <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
               #TKP
             </div>
+            {% if c.tkp > 0 %}
+            <div style="font-size: 10px; font-weight: 700; margin-top: 2px; color: {% if c.tkp_verified == c.tkp %}#059669{% else %}#b45309{% endif %};">
+              IA: {{ c.tkp_verified }}/{{ c.tkp }} OK
+            </div>
+            {% endif %}
           </td>
 
           <!-- TOTAL KPs -->
@@ -723,7 +738,7 @@
   </div>
 </div>
 
-<!-- SECCIÓN DE REGISTRO Y ALERTAS DE PAUSAS ENTRE LLAMADAS (≥ 30 MINUTOS) -->
+<!-- SECCIÓN DE REGISTRO Y ALERTAS DE PAUSAS ENTRE LLAMADAS (≥ 10 MINUTOS) -->
 <div class="executive-panel" style="padding: 0; overflow: hidden; margin-bottom: 28px; border: 1px solid #fecaca; box-shadow: 0 4px 6px -1px rgba(225, 29, 72, 0.05);">
   <div style="padding: 18px 24px; border-bottom: 1px solid var(--border); background: #fff1f2; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
     <div>
@@ -732,11 +747,11 @@
           CONTROL DE CADENCIA Y RITMO
         </span>
         <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: #9f1239;">
-          Alertas y Registro de Pausas Entre Llamadas (≥ 30 Minutos)
+          Alertas y Registro de Pausas Entre Llamadas (≥ 10 Minutos)
         </h3>
       </div>
       <p style="margin: 4px 0 0; font-size: 12.5px; color: #881337;">
-        Registra cada retraso &ge; 30 min desde que terminó una llamada hasta que inició la siguiente, <strong>excluyendo automáticamente la pausa y almuerzo (11:50 AM a 1:00 PM)</strong>, la <strong>pausa de la tarde (2:35 PM a 2:45 PM)</strong> y tiempos fuera de turno.
+        Registra cada retraso &ge; 10 min desde que terminó una llamada hasta que inició la siguiente, <strong>excluyendo automáticamente la pausa y almuerzo (11:50 AM a 1:00 PM)</strong>, la <strong>pausa de la tarde (2:35 PM a 2:45 PM)</strong> y tiempos fuera de turno.
       </p>
     </div>
 
@@ -762,8 +777,11 @@
       <button type="button" class="badge-pill" id="filterCrit" onclick="setInactivityFilter('crit')" style="cursor: pointer; border: 1px solid var(--border); background: white; color: #991b1b; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
         Críticas &gt;1h ({{ data.summary.total_critical_alerts }})
       </button>
-      <button type="button" class="badge-pill" id="filterNorm" onclick="setInactivityFilter('norm')" style="cursor: pointer; border: 1px solid var(--border); background: white; color: #b45309; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
-        Pausas 30-60 min ({{ data.summary.total_inactivity_alerts - data.summary.total_critical_alerts }})
+      <button type="button" class="badge-pill" id="filterWarn" onclick="setInactivityFilter('warn')" style="cursor: pointer; border: 1px solid var(--border); background: white; color: #b45309; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
+        Pausas 30-60 min ({{ data.summary.total_warning_alerts }})
+      </button>
+      <button type="button" class="badge-pill" id="filterMinor" onclick="setInactivityFilter('minor')" style="cursor: pointer; border: 1px solid var(--border); background: white; color: #0369a1; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
+        Pausas 10-30 min ({{ data.summary.total_minor_alerts }})
       </button>
     </div>
 
@@ -836,9 +854,13 @@
               <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-weight: 700; font-size: 10.5px;">
                 Almuerzo
               </span>
-            {% else %}
+            {% elif gap.severity == 'Warning' %}
               <span class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-weight: 800; font-size: 10.5px;">
-                Pausa Larga (&gt;30m)
+                Pausa 30-60m
+              </span>
+            {% else %}
+              <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 800; font-size: 10.5px;">
+                Pausa 10-30m
               </span>
             {% endif %}
           </td>
@@ -868,7 +890,214 @@
     </table>
     {% else %}
     <div style="padding: 36px 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
-      No se detectaron pausas de 30 minutos o más entre llamadas en este rango. Ritmo continuo verificado.
+      No se detectaron pausas de 10 minutos o más entre llamadas en este rango. Ritmo continuo verificado.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- SECCIÓN DE AUDITORÍA CON IA: TALKED TO KP, #EKP Y #TKP -->
+<div class="executive-panel" style="padding: 0; overflow: hidden; margin-bottom: 28px; border: 1px solid #bae6fd; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.06);">
+  <div style="padding: 18px 24px; border-bottom: 1px solid var(--border); background: #f0f9ff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 800; font-size: 11px;">
+          AUDITORIA INTELIGENTE
+        </span>
+        <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: #0c4a6e;">
+          Verificación con IA: Llamadas Talked to KP, #EKP y #TKP
+        </h3>
+      </div>
+      <p style="margin: 4px 0 0; font-size: 12.5px; color: #075985;">
+        Evalúa grabaciones y transcripciones de Close Notetaker para llamadas <strong>Talked to KP</strong> y cruza respuestas reales de Email/SMS para notas <strong>#EKP / #TKP</strong> ({{ 'Gemini 2.5 Flash activo' if data.ai_summary.gemini_enabled else 'Close Notetaker + Auditoría CRM' }}).
+      </p>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <a href="{{ url_for('commercial_dashboard_view', start_date=data.start_date, end_date=data.end_date, refresh='1') }}" class="btn-executive secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-color: #7dd3fc; background: white; color: #0369a1;">
+        <svg style="width: 13px; height: 13px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Re-Auditar con IA
+      </a>
+      <a href="{{ url_for('export_ai_audit_csv', start_date=data.start_date, end_date=data.end_date) }}" class="btn-executive secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-color: #7dd3fc; background: white; color: #0369a1;">
+        <svg style="width: 13px; height: 13px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        Descargar Auditoría CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- Resumen Métricas IA -->
+  <div style="padding: 14px 24px; background: white; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+    <div style="padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid #e2e8f0; background: #f8fafc;">
+      <div style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase;">Talked to KP (Llamadas)</div>
+      <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 4px; flex-wrap: wrap;">
+        <span style="font-size: 18px; font-weight: 900; color: #0f172a;">{{ data.ai_summary.calls_total }}</span>
+        <span style="font-size: 11.5px; font-weight: 700; color: #15803d;">{{ data.ai_summary.calls_verified }} Verificados</span>
+        <span style="font-size: 11.5px; font-weight: 700; color: #b45309;">{{ data.ai_summary.calls_suspect }} Sospechosos</span>
+        <span style="font-size: 11.5px; font-weight: 700; color: #b91c1c;">{{ data.ai_summary.calls_invalid }} Inválidos</span>
+      </div>
+    </div>
+
+    <div style="padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid #e2e8f0; background: #f8fafc;">
+      <div style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase;">#EKP &amp; #TKP (Email / SMS)</div>
+      <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 4px; flex-wrap: wrap;">
+        <span style="font-size: 18px; font-weight: 900; color: #0f172a;">{{ data.ai_summary.tags_total }}</span>
+        <span style="font-size: 11.5px; font-weight: 700; color: #15803d;">{{ data.ai_summary.tags_verified }} Verificados</span>
+        <span style="font-size: 11.5px; font-weight: 700; color: #b45309;">{{ data.ai_summary.tags_suspect }} Sospechosos</span>
+        <span style="font-size: 11.5px; font-weight: 700; color: #b91c1c;">{{ data.ai_summary.tags_invalid }} Inválidos</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de Filtros IA -->
+  <div style="padding: 12px 24px; background: #fafafa; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+      <button type="button" class="badge-pill" id="aiFilterAll" onclick="setAiAuditFilter('all')" style="cursor: pointer; border: 1px solid var(--brand); background: var(--brand); color: white; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
+        Todos ({{ data.ai_summary.calls_total + data.ai_summary.tags_total }})
+      </button>
+      <button type="button" class="badge-pill" id="aiFilterVerified" onclick="setAiAuditFilter('VERIFICADO')" style="cursor: pointer; border: 1px solid var(--border); background: white; color: #15803d; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
+        Verificados ({{ data.ai_summary.calls_verified + data.ai_summary.tags_verified }})
+      </button>
+      <button type="button" class="badge-pill" id="aiFilterSuspect" onclick="setAiAuditFilter('SOSPECHOSO')" style="cursor: pointer; border: 1px solid var(--border); background: white; color: #b45309; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
+        Sospechosos ({{ data.ai_summary.calls_suspect + data.ai_summary.tags_suspect }})
+      </button>
+      <button type="button" class="badge-pill" id="aiFilterInvalid" onclick="setAiAuditFilter('INVALIDO')" style="cursor: pointer; border: 1px solid var(--border); background: white; color: #b91c1c; font-weight: 700; font-size: 11.5px; padding: 4px 11px; border-radius: 9999px;">
+        Inválidos ({{ data.ai_summary.calls_invalid + data.ai_summary.tags_invalid }})
+      </button>
+    </div>
+
+    <div>
+      <input type="text" id="aiAuditSearch" placeholder="Filtrar por asesor, lead o motivo..." onkeyup="filterAiAuditTables()" style="padding: 6px 12px; font-size: 12px; border-radius: var(--radius-md); border: 1px solid var(--border); width: 230px;">
+    </div>
+  </div>
+
+  <!-- Sub-tabla 1: Llamadas Talked to KP -->
+  <div style="padding: 12px 24px 6px; background: #f8fafc; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 12.5px; color: #0c4a6e;">
+    Auditoría de Llamadas Marcadas como Talked to KP ({{ data.ai_call_audits|length }})
+  </div>
+  <div style="max-height: 380px; overflow-y: auto; border-bottom: 1px solid var(--border);">
+    {% if data.ai_call_audits %}
+    <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+      <thead>
+        <tr style="background: #f8fafc; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;">
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Asesor / Fecha</th>
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Lead</th>
+          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Duración</th>
+          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Veredicto IA</th>
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Análisis y Transcripción Notetaker</th>
+          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Audio</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in data.ai_call_audits %}
+        <tr class="ai-audit-row" data-verdict="{{ a.verdict }}" style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 10px 14px;">
+            <div style="font-weight: 700; color: var(--text-main);">{{ a.user_name }}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">{{ a.date }} · {{ a.direction|capitalize }}</div>
+          </td>
+          <td style="padding: 10px 14px; font-weight: 700; color: var(--text-main);">
+            {{ a.lead_name or a.lead_id }}
+          </td>
+          <td style="padding: 10px 14px; text-align: center; font-weight: 700;">
+            {{ a.duration }}s
+          </td>
+          <td style="padding: 10px 14px; text-align: center;">
+            <span class="badge" style="background: {% if a.verdict == 'VERIFICADO' %}#dcfce7; color: #15803d; border: 1px solid #86efac;{% elif a.verdict == 'INVALIDO' %}#fee2e2; color: #991b1b; border: 1px solid #fecaca;{% else %}#fef3c7; color: #b45309; border: 1px solid #fde68a;{% endif %} font-weight: 800; font-size: 10.5px;">
+              {{ a.verdict }} ({{ a.score }}%)
+            </span>
+            <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; font-weight: 600;">
+              {{ a.category }}
+            </div>
+          </td>
+          <td style="padding: 10px 14px; max-width: 440px;">
+            <div style="font-weight: 700; color: var(--text-main); font-size: 12px;">{{ a.reason }}</div>
+            {% if a.summary %}
+            <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 3px; line-height: 1.4;">{{ a.summary }}</div>
+            {% elif a.evidence %}
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px; font-style: italic;">{{ a.evidence }}</div>
+            {% endif %}
+          </td>
+          <td style="padding: 10px 14px; text-align: center;">
+            {% if a.has_recording %}
+            <a href="/call-recording/{{ a.id }}" target="_blank" style="display: inline-block; padding: 4px 9px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid #bae6fd; background: #f0f9ff; color: #0369a1; text-decoration: none;">
+              Escuchar
+            </a>
+            {% else %}
+            <span style="color: var(--text-muted); font-size: 11px;">Sin audio</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12.5px;">
+      No se registraron llamadas marcadas como Talked to KP en este periodo.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Sub-tabla 2: Notas #EKP y #TKP -->
+  <div style="padding: 12px 24px 6px; background: #f8fafc; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 12.5px; color: #5b21b6;">
+    Auditoría de #EKP (Email KP) y #TKP (Text KP) con Evidencia CRM ({{ data.ai_tag_audits|length }})
+  </div>
+  <div style="max-height: 360px; overflow-y: auto;">
+    {% if data.ai_tag_audits %}
+    <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+      <thead>
+        <tr style="background: #f8fafc; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;">
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Tag / Fecha</th>
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Asesor</th>
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Lead</th>
+          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Veredicto IA</th>
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Validación de Evidencia (Email / SMS)</th>
+          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Nota del Asesor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in data.ai_tag_audits %}
+        <tr class="ai-audit-row" data-verdict="{{ t.verdict }}" style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 10px 14px;">
+            {% if t.type == 'EKP' %}
+              <span class="badge" style="background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; font-size: 10.5px; font-weight: 800;">#EKP</span>
+            {% else %}
+              <span class="badge" style="background: #fef3c7; color: #b45309; border: 1px solid #fde68a; font-size: 10.5px; font-weight: 800;">#TKP</span>
+            {% endif %}
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 3px;">{{ t.date }}</div>
+          </td>
+          <td style="padding: 10px 14px; font-weight: 700; color: var(--text-main);">
+            {{ t.user_name }}
+          </td>
+          <td style="padding: 10px 14px; font-weight: 700; color: var(--text-main);">
+            {{ t.lead_name or t.lead_id }}
+          </td>
+          <td style="padding: 10px 14px; text-align: center;">
+            <span class="badge" style="background: {% if t.verdict == 'VERIFICADO' %}#dcfce7; color: #15803d; border: 1px solid #86efac;{% elif t.verdict == 'INVALIDO' %}#fee2e2; color: #991b1b; border: 1px solid #fecaca;{% else %}#fef3c7; color: #b45309; border: 1px solid #fde68a;{% endif %} font-weight: 800; font-size: 10.5px;">
+              {{ t.verdict }} ({{ t.score }}%)
+            </span>
+            <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 3px; font-weight: 600;">
+              {{ t.category }}
+            </div>
+          </td>
+          <td style="padding: 10px 14px; max-width: 340px;">
+            <div style="font-weight: 700; color: var(--text-main); font-size: 12px;">{{ t.reason }}</div>
+            {% if t.evidence %}
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 3px;">{{ t.evidence }}</div>
+            {% endif %}
+          </td>
+          <td style="padding: 10px 14px; max-width: 280px; font-size: 11.5px; color: var(--text-secondary);">
+            {{ t.text }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding: 24px; text-align: center; color: var(--text-muted); font-size: 12.5px;">
+      No se registraron notas con #EKP ni #TKP para auditar en este periodo.
     </div>
     {% endif %}
   </div>
@@ -984,7 +1213,7 @@ function setInactivityFilter(type) {
   currentInactivityType = type;
   
   // Actualizar estilos de los botones
-  const btnIds = ["filterAll", "filterCrit", "filterNorm"];
+  const btnIds = ["filterAll", "filterCrit", "filterWarn", "filterMinor"];
   btnIds.forEach(id => {
     const btn = document.getElementById(id);
     if (!btn) return;
@@ -996,7 +1225,8 @@ function setInactivityFilter(type) {
   const activeBtn = {
     "all": document.getElementById("filterAll"),
     "crit": document.getElementById("filterCrit"),
-    "norm": document.getElementById("filterNorm")
+    "warn": document.getElementById("filterWarn"),
+    "minor": document.getElementById("filterMinor")
   }[type];
 
   if (activeBtn) {
@@ -1020,8 +1250,10 @@ function filterInactivityTable() {
     let matchesType = true;
     if (currentInactivityType === "crit") {
       matchesType = (severity === "Critical");
-    } else if (currentInactivityType === "norm") {
-      matchesType = (severity !== "Critical");
+    } else if (currentInactivityType === "warn") {
+      matchesType = (severity === "Warning");
+    } else if (currentInactivityType === "minor") {
+      matchesType = (severity === "Minor");
     }
 
     const matchesSearch = text.includes(filter);
@@ -1031,6 +1263,50 @@ function filterInactivityTable() {
     } else {
       row.style.display = "none";
     }
+  });
+}
+
+let currentAiVerdict = "all";
+
+function setAiAuditFilter(verdict) {
+  currentAiVerdict = verdict;
+  const btnIds = ["aiFilterAll", "aiFilterVerified", "aiFilterSuspect", "aiFilterInvalid"];
+  btnIds.forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.style.background = "white";
+    btn.style.color = "var(--text-main)";
+    btn.style.borderColor = "var(--border)";
+  });
+
+  const activeBtn = {
+    "all": document.getElementById("aiFilterAll"),
+    "VERIFICADO": document.getElementById("aiFilterVerified"),
+    "SOSPECHOSO": document.getElementById("aiFilterSuspect"),
+    "INVALIDO": document.getElementById("aiFilterInvalid")
+  }[verdict];
+
+  if (activeBtn) {
+    activeBtn.style.background = "var(--brand)";
+    activeBtn.style.color = "white";
+    activeBtn.style.borderColor = "var(--brand)";
+  }
+
+  filterAiAuditTables();
+}
+
+function filterAiAuditTables() {
+  const searchInput = document.getElementById("aiAuditSearch");
+  const filter = searchInput ? searchInput.value.toLowerCase() : "";
+  const rows = document.querySelectorAll(".ai-audit-row");
+
+  rows.forEach(row => {
+    const text = row.innerText.toLowerCase();
+    const verdict = row.getAttribute("data-verdict");
+    const matchesVerdict = (currentAiVerdict === "all") || (verdict === currentAiVerdict);
+    const matchesSearch = text.includes(filter);
+
+    row.style.display = (matchesVerdict && matchesSearch) ? "" : "none";
   });
 }
 

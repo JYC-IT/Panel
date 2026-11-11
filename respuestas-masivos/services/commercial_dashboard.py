@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(root_dir, ".env"), override=True)
 
+import db
 from connectors import close_crm
+from services import ai_verifier
 
 BASE_URL = close_crm.BASE_URL
 KP_OUTCOME_ID = close_crm.KP_OUTCOME_ID
@@ -186,14 +188,69 @@ def get_effective_gap_minutes(dt_end, dt_start, work_ranges):
     return eff_min, raw_min, disc_min
 
 
+def _resolve_lead_names(lead_ids, auth):
+    """Resuelve nombres legibles de leads usando caché SQLite local y fallback a Close API."""
+    clean_ids = []
+    seen = set()
+    for lid in (lead_ids or []):
+        s_lid = str(lid or "")
+        if s_lid.startswith("lead_") and s_lid not in seen:
+            seen.add(s_lid)
+            clean_ids.append(s_lid)
+    if not clean_ids:
+        return {}
+
+    cached = db.get_cached_leads(clean_ids)
+    names_map = {lid: info.get("display_name") for lid, info in cached.items() if info.get("display_name")}
+    missing = [lid for lid in clean_ids if lid not in names_map]
+    if not missing or not auth:
+        return names_map
+
+    # Priorizar los primeros 80 faltantes (llamadas KP y notas #EKP/#TKP primero)
+    to_fetch = missing[:80]
+
+    def _fetch_one(lid):
+        try:
+            r = requests.get(
+                f"{BASE_URL}/lead/{lid}/",
+                auth=auth,
+                params={"_fields": "id,display_name"},
+                timeout=8,
+            )
+            if r.status_code == 200:
+                data = r.json()
+                name = data.get("display_name") or data.get("name")
+                if name:
+                    return lid, name
+        except Exception:
+            pass
+        return lid, None
+
+    newly_resolved = {}
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for lid, name in pool.map(_fetch_one, to_fetch):
+            if name:
+                names_map[lid] = name
+                newly_resolved[lid] = {"display_name": name}
+
+    if newly_resolved:
+        try:
+            db.save_cached_leads(newly_resolved)
+        except Exception:
+            pass
+
+    return names_map
+
+
 def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=False):
     """
     Obtiene todas las métricas para el panel comercial de Hernán:
     - Lista ordenada y exclusiva de los comerciales seleccionados.
     - Llamadas: Total, Salientes, Entrantes, Gross Dial Time, Live KP Talk
     - Horarios de inicio y fin: First Call of the day (Time) y Last Call of the day (Time)
-    - Alertas de Inactividad >= 30 min (descontando almuerzo 12-1 y tiempos fuera de turno)
-    - KPIs #EKP y #TKP
+    - Alertas de Inactividad >= 10 min (descontando almuerzo 11:50-1:00, pausa 2:35-2:45 y fuera de turno)
+    - KPIs #EKP y #TKP con Auditoría IA de evidencias reales en Close CRM
+    - Auditoría IA de llamadas Talked to KP (Close Notetaker / Gemini)
     - Total KPs (Talked to KP + EKP + TKP)
     - Emails Enviados
     - Oportunidades: Total, Sales Pipeline, Purchase Pipeline
@@ -344,9 +401,10 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                     if is_ekp:
                         tags_data["ekp_by_user"][uid] += 1
                         tags_data["records"].append({
+                            "activity_id": n.get("id"),
                             "type": "EKP",
                             "user_id": uid,
-                            "user_name": n.get("user_name"),
+                            "user_name": n.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor"),
                             "date": n.get("date_created"),
                             "lead_id": n.get("lead_id"),
                             "lead_name": n.get("lead_name") or "",
@@ -355,9 +413,10 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                     if is_tkp:
                         tags_data["tkp_by_user"][uid] += 1
                         tags_data["records"].append({
+                            "activity_id": n.get("id"),
                             "type": "TKP",
                             "user_id": uid,
-                            "user_name": n.get("user_name"),
+                            "user_name": n.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor"),
                             "date": n.get("date_created"),
                             "lead_id": n.get("lead_id"),
                             "lead_name": n.get("lead_name") or "",
@@ -438,6 +497,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         all_gaps = []
         gaps_by_user = defaultdict(list)
         first_last_by_user = defaultdict(dict)
+        kp_calls = []
 
         local_tz = timezone(timedelta(hours=-5))
 
@@ -463,6 +523,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                     raw_date = c.get("date_created")
                     if not uid or not raw_date or uid not in COMMERCIAL_MAP:
                         continue
+                    if c.get("outcome_id") == KP_OUTCOME_ID:
+                        kp_calls.append(c)
                     try:
                         clean_dt = raw_date.replace("Z", "+00:00")
                         dt_utc = datetime.fromisoformat(clean_dt)
@@ -495,14 +557,23 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "last_dt": last_dt
                     }
 
-                # A. Alerta de Demora en Inicio de Turno (si primera llamada es >= 30 min tras hora de entrada)
+                # A. Alerta de Demora en Inicio de Turno (si primera llamada es >= 10 min tras hora de entrada)
                 shift_start_t = w_ranges[0][0]
                 shift_start_dt = datetime.combine(first_dt.date(), shift_start_t, local_tz)
                 if first_dt > shift_start_dt:
                     init_delay_min = round((first_dt - shift_start_dt).total_seconds() / 60.0, 1)
-                    if init_delay_min >= 30.0:
+                    if init_delay_min >= 10.0:
                         u_name = ucalls[0][1].get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor")
                         raw_human = f"{int(init_delay_min // 60)}h {int(init_delay_min % 60):02d}m" if init_delay_min >= 60 else f"{int(init_delay_min)} min"
+                        if init_delay_min >= 60:
+                            init_sev = "Critical"
+                            init_ptype = "Inicio Muy Tardío (>1h)"
+                        elif init_delay_min >= 30:
+                            init_sev = "Warning"
+                            init_ptype = "Inicio Tardío (30-60m)"
+                        else:
+                            init_sev = "Minor"
+                            init_ptype = "Inicio Tardío (10-30m)"
                         init_gap = {
                             "user_id": uid,
                             "user_name": u_name,
@@ -515,8 +586,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                             "gap_human": raw_human,
                             "from_time": shift_start_dt.strftime("%I:%M %p"),
                             "to_time": first_dt.strftime("%I:%M %p"),
-                            "pause_type": "Inicio Tardío" if init_delay_min < 60 else "Inicio Muy Tardío (>1h)",
-                            "severity": "Critical" if init_delay_min >= 60 else "Warning",
+                            "pause_type": init_ptype,
+                            "severity": init_sev,
                             "is_lunch": False,
                             "phone_before": "Inicio de Turno",
                             "phone_after": ucalls[0][1].get("remote_phone_formatted") or ucalls[0][1].get("remote_phone") or "N/A",
@@ -528,7 +599,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         gaps_by_user[uid].append(init_gap)
                         all_gaps.append(init_gap)
 
-                # B. Intervalos entre llamadas a lo largo del día
+                # B. Intervalos entre llamadas a lo largo del día (>= 10 min)
                 for i in range(len(ucalls) - 1):
                     dt1, c1 = ucalls[i]
                     dt2, c2 = ucalls[i+1]
@@ -537,10 +608,6 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                     end1 = dt1 + dur1
 
                     # Excluir cualquier intervalo que cruce la ventana de almuerzo (11:50 AM a 1:00 PM).
-                    # El almuerzo (pausa matutina 11:50-12:00 + almuerzo 12:00-13:00) es el corte natural de la jornada.
-                    # El control de a qué hora cortó antes del almuerzo y a qué hora retomó en la tarde
-                    # se audita y monitorea exclusivamente en el "Control de Jornada (Primera y Última Llamada)"
-                    # para evitar generar alertas artificiales por el receso del almuerzo.
                     lunch_start_dt = datetime.combine(end1.date(), dt_time(11, 50), local_tz)
                     lunch_end_dt = datetime.combine(end1.date(), dt_time(13, 0), local_tz)
                     if end1 < lunch_end_dt and dt2 > lunch_start_dt:
@@ -548,9 +615,16 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
 
                     eff_minutes, raw_diff_minutes, disc_minutes = get_effective_gap_minutes(end1, dt2, w_ranges)
 
-                    if eff_minutes >= 30.0:
-                        severity = "Critical" if eff_minutes >= 60.0 else "Warning"
-                        pause_type = "Crítica (>1h)" if eff_minutes >= 60.0 else "Pausa Larga (>30m)"
+                    if eff_minutes >= 10.0:
+                        if eff_minutes >= 60.0:
+                            severity = "Critical"
+                            pause_type = "Crítica (>1h)"
+                        elif eff_minutes >= 30.0:
+                            severity = "Warning"
+                            pause_type = "Pausa Larga (30-60m)"
+                        else:
+                            severity = "Minor"
+                            pause_type = "Pausa Corta (10-30m)"
 
                         disc_human = f"-{int(disc_minutes // 60)}h {int(disc_minutes % 60):02d}m" if disc_minutes >= 60 else f"-{int(disc_minutes)}m" if disc_minutes > 0 else ""
                         raw_human = f"{int(raw_diff_minutes // 60)}h {int(raw_diff_minutes % 60):02d}m" if raw_diff_minutes >= 60 else f"{int(raw_diff_minutes)} min"
@@ -741,6 +815,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         return {
             "by_user": gaps_by_user,
             "all_gaps": all_gaps,
+            "kp_calls": kp_calls,
             "first_last": first_last_by_user,
             "daily_records": all_daily_records,
             "latest_by_user": user_latest_checkpoints
@@ -761,6 +836,67 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         tasks_set = f_tset.result()
         tasks_done = f_tdone.result()
         call_gaps = f_gaps.result()
+
+    # Resolver nombres de leads priorizando llamadas KP y notas #EKP/#TKP primero
+    needed_lead_ids = []
+    for c in call_gaps.get("kp_calls", []):
+        if c.get("lead_id") and (not c.get("lead_name") or str(c.get("lead_name")).startswith("lead_")):
+            needed_lead_ids.append(c["lead_id"])
+    for rec in notes_tags.get("records", []):
+        if rec.get("lead_id") and (not rec.get("lead_name") or rec.get("lead_name") in ("Sin Nombre", "Lead") or str(rec.get("lead_name")).startswith("lead_")):
+            needed_lead_ids.append(rec["lead_id"])
+    for g in call_gaps.get("all_gaps", []):
+        if g.get("lead_id_before") and str(g.get("lead_before", "")).startswith("lead_"):
+            needed_lead_ids.append(g["lead_id_before"])
+        if g.get("lead_id_after") and str(g.get("lead_after", "")).startswith("lead_"):
+            needed_lead_ids.append(g["lead_id_after"])
+
+    lead_names_map = _resolve_lead_names(needed_lead_ids, auth)
+    for c in call_gaps.get("kp_calls", []):
+        lid = c.get("lead_id")
+        if lid and lid in lead_names_map:
+            c["lead_name"] = lead_names_map[lid]
+    for rec in notes_tags.get("records", []):
+        lid = rec.get("lead_id")
+        if lid and lid in lead_names_map:
+            rec["lead_name"] = lead_names_map[lid]
+    for g in call_gaps.get("all_gaps", []):
+        if g.get("lead_id_before") in lead_names_map:
+            g["lead_before"] = lead_names_map[g["lead_id_before"]]
+        if g.get("lead_id_after") in lead_names_map:
+            g["lead_after"] = lead_names_map[g["lead_id_after"]]
+
+    # Auditoría con IA en paralelo: Talked to KP + #EKP / #TKP
+    ai_call_audits = []
+    ai_tag_audits = []
+    with ThreadPoolExecutor(max_workers=2) as ai_pool:
+        f_ai_calls = ai_pool.submit(
+            ai_verifier.verify_kp_calls_batch,
+            call_gaps.get("kp_calls", []),
+            force=force_refresh,
+        )
+        f_ai_tags = ai_pool.submit(
+            ai_verifier.verify_tagged_kps_batch,
+            notes_tags.get("records", []),
+            force=force_refresh,
+        )
+        try:
+            ai_call_audits = f_ai_calls.result()
+        except Exception as e:
+            print(f"Error in AI KP call verification: {e}")
+        try:
+            ai_tag_audits = f_ai_tags.result()
+        except Exception as e:
+            print(f"Error in AI EKP/TKP verification: {e}")
+
+    call_audits_by_user = defaultdict(lambda: {"VERIFICADO": 0, "SOSPECHOSO": 0, "INVALIDO": 0})
+    for a in ai_call_audits:
+        call_audits_by_user[a.get("user_id")][a.get("verdict", "SOSPECHOSO")] += 1
+
+    tag_audits_by_user_type = defaultdict(int)
+    for a in ai_tag_audits:
+        if a.get("verdict") == "VERIFICADO":
+            tag_audits_by_user_type[(a.get("user_id"), a.get("type"))] += 1
 
     # --- Consolidación por Comercial en el Orden Estricto Requerido ---
     commercial_rows = []
@@ -877,6 +1013,9 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "calls_total": c_total,
             "gross_dial_time": dur_info,
             "live_kp": live_kp,
+            "live_kp_verified": call_audits_by_user[uid]["VERIFICADO"],
+            "live_kp_suspect": call_audits_by_user[uid]["SOSPECHOSO"],
+            "live_kp_invalid": call_audits_by_user[uid]["INVALIDO"],
             # Inactividad entre llamadas
             "inactivity_count": gaps_count,
             "inactivity_total_min": gaps_total_min,
@@ -885,6 +1024,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             # KPIs Hashtags
             "ekp": ekp,
             "tkp": tkp,
+            "ekp_verified": tag_audits_by_user_type[(uid, "EKP")],
+            "tkp_verified": tag_audits_by_user_type[(uid, "TKP")],
             "total_kps": all_kps,
             "effectiveness": eff_rate,
             # Emails
@@ -938,9 +1079,31 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "total_tasks_set": tot_tset,
         "total_tasks_done": tot_tdone,
         "team_effectiveness": round(100.0 * tot_live_kps / tot_calls, 2) if tot_calls else 0.0,
-        # Inactividad / Alertas de Pausas > 30 min (operativas sin almuerzo)
+        # Inactividad / Alertas de Pausas >= 10 min (operativas sin almuerzo ni pausa tarde)
         "total_inactivity_alerts": len(call_gaps["all_gaps"]),
         "total_critical_alerts": len([g for g in call_gaps["all_gaps"] if g["severity"] == "Critical"]),
+        "total_warning_alerts": len([g for g in call_gaps["all_gaps"] if g["severity"] == "Warning"]),
+        "total_minor_alerts": len([g for g in call_gaps["all_gaps"] if g["severity"] == "Minor"]),
+        # Auditoría IA
+        "total_live_kp_verified": sum(1 for a in ai_call_audits if a.get("verdict") == "VERIFICADO"),
+        "total_ekp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
+        "total_tkp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
+    }
+
+    ai_summary = {
+        "calls_total": len(ai_call_audits),
+        "calls_verified": sum(1 for a in ai_call_audits if a.get("verdict") == "VERIFICADO"),
+        "calls_suspect": sum(1 for a in ai_call_audits if a.get("verdict") == "SOSPECHOSO"),
+        "calls_invalid": sum(1 for a in ai_call_audits if a.get("verdict") == "INVALIDO"),
+        "tags_total": len(ai_tag_audits),
+        "tags_verified": sum(1 for a in ai_tag_audits if a.get("verdict") == "VERIFICADO"),
+        "tags_suspect": sum(1 for a in ai_tag_audits if a.get("verdict") == "SOSPECHOSO"),
+        "tags_invalid": sum(1 for a in ai_tag_audits if a.get("verdict") == "INVALIDO"),
+        "ekp_total": sum(1 for a in ai_tag_audits if a.get("type") == "EKP"),
+        "ekp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
+        "tkp_total": sum(1 for a in ai_tag_audits if a.get("type") == "TKP"),
+        "tkp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
+        "gemini_enabled": any(str(a.get("model_used", "")).startswith("Gemini") for a in (ai_call_audits + ai_tag_audits)),
     }
 
     result = {
@@ -953,6 +1116,9 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "opportunities_list": opps_data["list"],
         "inactivity_records": call_gaps["all_gaps"],
         "discipline_records": call_gaps.get("daily_records", []),
+        "ai_call_audits": ai_call_audits,
+        "ai_tag_audits": ai_tag_audits,
+        "ai_summary": ai_summary,
     }
 
     _DASHBOARD_CACHE[cache_key] = {
