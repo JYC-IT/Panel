@@ -53,14 +53,14 @@ class AppTestCase(unittest.TestCase):
             self.assertIn(b"Asesor Comercial", res_csv.data)
 
     def test_commercial_dashboard_view(self):
-        """Vista del Panel Comercial de Hernán y exportación CSV."""
+        """Vista del Panel Comercial y exportación CSV."""
         with self.client.session_transaction() as sess:
             sess["user_id"] = 1
             sess["user_email"] = "admin@jycexports.com"
             sess["user_role"] = "admin"
         res = self.client.get("/commercial-dashboard?start_date=2026-11-02&end_date=2026-11-06")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("Hernán Bonilla".encode("utf-8"), res.data)
+        self.assertIn("Panel de Control Comercial".encode("utf-8"), res.data)
         self.assertIn(b"Gross Dial Time", res.data)
         self.assertIn(b"#EKP", res.data)
 
