@@ -276,7 +276,7 @@ def _filter_dashboard_for_team(result, allowed_user_ids):
     if not result:
         return result
 
-    commercials = [c for c in result.get("commercials", []) if c.get("user_id") in allowed_user_ids]
+    commercials = [c for c in result.get("commercials", []) if (c.get("id") or c.get("user_id")) in allowed_user_ids]
     inactivity = [g for g in result.get("inactivity_records", []) if g.get("user_id") in allowed_user_ids]
     discipline = [d for d in result.get("discipline_records", []) if d.get("user_id") in allowed_user_ids]
     tagged = [t for t in result.get("tagged_records", []) if t.get("user_id") in allowed_user_ids]
@@ -284,8 +284,8 @@ def _filter_dashboard_for_team(result, allowed_user_ids):
     ai_tags = [a for a in result.get("ai_tag_audits", []) if a.get("user_id") in allowed_user_ids]
     opps = [o for o in result.get("opportunities_list", []) if o.get("user_id") in allowed_user_ids]
 
-    tot_out = sum(c.get("calls_outbound", 0) for c in commercials)
-    tot_in = sum(c.get("calls_inbound", 0) for c in commercials)
+    tot_out = sum(c.get("calls_out", 0) for c in commercials)
+    tot_in = sum(c.get("calls_in", 0) for c in commercials)
     tot_calls = sum(c.get("calls_total", 0) for c in commercials)
     tot_dur_sec = sum(c.get("gross_dial_time", {}).get("seconds", 0) for c in commercials)
     tot_live_kps = sum(c.get("live_kp", 0) for c in commercials)

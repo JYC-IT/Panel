@@ -10,7 +10,7 @@ Combina:
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from dotenv import load_dotenv
@@ -22,6 +22,21 @@ root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(root_dir, ".env"), override=True)
 
 BASE_URL = close_crm.BASE_URL
+LOCAL_TZ = timezone(timedelta(hours=-5))
+
+
+def _format_local_dt(iso_str):
+    """Convierte un timestamp ISO UTC de Close CRM a hora local (UTC-5) YYYY-MM-DD HH:MM."""
+    raw = (iso_str or "").strip()
+    if not raw:
+        return ""
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(LOCAL_TZ).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return raw[:16].replace("T", " ")
 
 
 def _get_gemini_client():
@@ -364,7 +379,7 @@ def verify_kp_calls_batch(call_records, force=False):
             "user_name": base_c.get("user_name"),
             "lead_id": base_c.get("lead_id"),
             "lead_name": base_c.get("lead_name") or base_c.get("lead_id") or "Sin Lead",
-            "date": (base_c.get("date_created") or "")[:16].replace("T", " "),
+            "date": _format_local_dt(base_c.get("date_created")),
             "duration": int(base_c.get("duration") or 0),
             "direction": base_c.get("direction") or "outbound",
             "has_recording": bool(base_c.get("recording_url") or base_c.get("has_recording")),
@@ -607,7 +622,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
             "user_name": r.get("user_name"),
             "lead_id": r.get("lead_id"),
             "lead_name": r.get("lead_name") or r.get("lead_id") or "Sin Lead",
-            "date": (r.get("date") or "")[:16].replace("T", " "),
+            "date": _format_local_dt(r.get("date")),
             "text": r.get("text") or "",
             "verdict": audit["verdict"],
             "category": audit["category"],
