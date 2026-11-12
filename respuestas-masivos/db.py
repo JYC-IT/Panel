@@ -633,18 +633,23 @@ def classify_campaign(c):
     name = (c.get("name") or "").lower()
     subj = (c.get("match_subject") or "").lower()
     reply_to = (c.get("reply_to_email") or "").lower()
+    content_text = f"{name} {subj}"
     full_text = f"{name} {subj} {reply_to}"
 
     # 1. Línea de negocio
-    if ("medical" in full_text or "mri" in full_text or "ct " in full_text
+    # Los que dicen 'multi' o 'multi industria' son de Multi Industria
+    if "multi" in name or "multi industria" in content_text or "wholesale" in content_text or "riggers" in content_text:
+        business = "Multi Industria"
+    elif ("medical" in full_text or "mri" in full_text or "ct " in full_text
             or "hospital" in full_text or "ultrasound" in full_text or "jycmedical" in reply_to):
         business = "Medical"
     elif ("machinery" in full_text or "injection" in full_text or "molding" in full_text
           or "engel" in full_text or "krauss" in full_text or "sumitomo" in full_text
           or "haitian" in full_text or "jycmachinery" in reply_to):
         business = "Machinery"
-    elif ("container handler" in full_text or "puerto" in full_text or "port" in full_text
-          or "terminal" in full_text or "reachstacker" in full_text or "breakbulk" in full_text
+    elif ("container handler" in full_text or "puerto" in full_text or re.search(r'\bports?\b', content_text)
+          or "jycports" in full_text or "reachstacker" in full_text or "breakbulk" in full_text
+          or "terminal" in full_text or "toppick" in full_text or "top pick" in full_text
           or "long beach" in full_text or ("hernan" in name and "loaded" in full_text)):
         business = "Puertos"
     else:
