@@ -220,8 +220,15 @@ def _enrich_single_campaign(token: str, c: dict, known_campaigns: dict = None) -
     cid = c.get("campaign_id")
     name = c.get("name") or cid
     status = c.get("current_status")
-    created_at = c.get("created_at") or c.get("updated_at") or ""
-    date_str = created_at[:10] if created_at else None
+    created_at = c.get("created_at") or ""
+    updated_at = c.get("updated_at") or ""
+
+    # Si la campaña ya fue enviada ('Done' o 'Sent'), la fecha real de envío es updated_at.
+    # Cuando aún está en borrador ('Draft'), se toma created_at o updated_at.
+    if status in ("Done", "Sent") and updated_at:
+        date_str = updated_at[:10]
+    else:
+        date_str = (created_at or updated_at)[:10] if (created_at or updated_at) else None
 
     # Verificamos si ya tenemos datos conocidos en SQLite
     known_data = (known_campaigns or {}).get(cid)

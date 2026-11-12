@@ -196,7 +196,7 @@ def sync_constantcontact_campaigns():
                        opens_count=excluded.opens_count,
                        clicks_count=excluded.clicks_count,
                        bounces_count=excluded.bounces_count,
-                       start_date=COALESCE(campaigns.start_date, excluded.start_date)""",
+                       start_date=COALESCE(excluded.start_date, campaigns.start_date)""",
                 (name, subject, reply_to or None, cid, sent, opens, clicks, bounces, start_date),
             )
             if cur.rowcount > 0:
