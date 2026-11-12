@@ -97,7 +97,7 @@ def register_report_routes(app):
         since = request.args.get("since") or (date.today() - timedelta(days=42)).isoformat()
         selected_week = request.args.get("week", type=int)
         business_summary, business_totals = db.get_business_summary(since_date=since)
-        weekly_kpis = db.get_weekly_kpis(limit=6)
+        weekly_kpis = db.get_weekly_kpis(limit=4)
 
         # Close CRM: disponibilidad, asesores y desglose individual
         close_available = close_crm.is_available()
@@ -145,7 +145,7 @@ def register_report_routes(app):
             designated_agents=designated_agents,
             all_users=all_users,
             agent_kpis=agent_kpis,
-            selected_week=selected_week or (agent_kpis[0]["week_number"] if agent_kpis else 24),
+            selected_week=selected_week or (agent_kpis[0]["week_number"] if agent_kpis else (weekly_kpis[-1]["week_number"] if weekly_kpis else 27)),
         )
 
     @app.post("/weekly-report/sync-close")

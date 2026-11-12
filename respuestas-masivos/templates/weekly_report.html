@@ -10,7 +10,7 @@
         Dirección Comercial & Marketing · JYC Equipment
       </div>
       <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: var(--text-main); letter-spacing: -0.4px;">
-        Reunión Semanal de Resultados (Histórico de 6 Semanas)
+        Reunión Semanal de Resultados (Histórico de 4 Semanas)
       </h2>
       <p style="margin: 4px 0 0; font-size: 13px; color: var(--text-secondary);">
         Auditoría de Llamadas Salientes, KPs Calificados, Conversión Masiva y Desglose por Línea de Negocio.
@@ -179,13 +179,13 @@
 </div>
 
 <!-- ======================================================== -->
-<!-- SECCIÓN 2: LLAMADAS DEL EQUIPO (TEAM CALLS - LAST 6 WEEKS) -->
+<!-- SECCIÓN 2: LLAMADAS DEL EQUIPO (TEAM CALLS - LAST 4 WEEKS) -->
 <!-- ======================================================== -->
 <div class="panel" style="border-top:4px solid #1e3a8a;">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
     <div>
       <h2 style="margin:0; font-size:19px; display:flex; align-items:center; gap:8px;">
-        <span>📞</span> Team Calls — Last 6 Weeks (W20 a W25)
+        Team Calls — Últimas 4 Semanas
       </h2>
       <p class="muted" style="margin:3px 0 0;">Llamadas matutinas (AM) vs vespertinas (PM) del equipo comercial</p>
     </div>
@@ -259,7 +259,7 @@
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
     <div>
       <h2 style="margin:0; font-size:19px; display:flex; align-items:center; gap:8px;">
-        <span>🎯</span> Team KP & Effectiveness — Last 6 Weeks (W20 a W25)
+        Team KP & Effectiveness — Últimas 4 Semanas
       </h2>
       <p class="muted" style="margin:3px 0 0;">Contactos Clave alcanzados (KPs) y Tasa de Efectividad (% = KPs / Llamadas)</p>
     </div>
@@ -325,7 +325,7 @@
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:10px;">
     <div>
       <h2 style="margin:0; font-size:19px; display:flex; align-items:center; gap:8px;">
-        <span>📨</span> Weekly Outreach Volume & Email Engagement — Last 6 Weeks (W20 a W25)
+        Weekly Outreach Volume & Email Engagement — Últimas 4 Semanas
       </h2>
       <p class="muted" style="margin:3px 0 0;">Volumen de correos (Constant Contact + Instantly) y SMS enviados, aperturas registradas y tasa de clics (%)</p>
     </div>
@@ -1176,5 +1176,15 @@ document.addEventListener("DOMContentLoaded", function() {
     }]
   });
 });
+
+// Auto-actualización cada 5 minutos si no hay ningún modal abierto
+setInterval(function() {
+  var openModal = Array.from(document.querySelectorAll('[id$="Modal"]')).some(function(el) {
+    return el.style.display && el.style.display !== 'none';
+  });
+  if (!openModal) {
+    window.location.reload();
+  }
+}, 300000);
 </script>
 {% endblock %}

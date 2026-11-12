@@ -281,6 +281,110 @@ def sync_instantly_campaigns():
     return f"Instantly: {len(remote)} campañas, {new} respuestas nuevas{extra}"
 
 
+def sync_weekly_close_kpis():
+    """Sincroniza automáticamente la semana actual (Lunes-Viernes) desde Close CRM + campañas hacia weekly_team_kpis y mantiene solo 4 semanas."""
+    from datetime import date, timedelta
+    from connectors import close_crm
+
+    if not close_crm.is_available():
+        return "Weekly KPIs: Close CRM no configurado (omitido)"
+
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    friday = monday + timedelta(days=4)
+    sunday = monday + timedelta(days=6)
+
+    # Semana 27 inició el lunes 2026-11-02
+    week_number = 27 + ((monday - date(2026, 11, 2)).days // 7)
+    week_label = f"Week {week_number}"
+    months_es = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    if monday.month == friday.month:
+        date_range = f"{months_es[monday.month]} {monday.day} - {friday.day}"
+    else:
+        date_range = f"{months_es[monday.month]} {monday.day} - {months_es[friday.month]} {friday.day}"
+
+    all_users = close_crm.list_users()
+    designated_ids = [u["id"] for u in all_users if u.get("is_designated")]
+    res = close_crm.fetch_week_activity(monday.isoformat(), friday.isoformat(), designated_ids)
+    if not res:
+        return f"Weekly KPIs (W{week_number}): sin respuesta de Close CRM"
+
+    close_crm_calls = int(res.get("total_calls") or 0)
+    am_crm = int(res.get("am_calls") or 0)
+    pm_crm = int(res.get("pm_calls") or 0)
+    kps = int(res.get("kps") or 0)
+
+    with db.get_conn() as conn:
+        existing = conn.execute(
+            "SELECT ringcentral_calls, outreach_sms, notes FROM weekly_team_kpis WHERE week_number = ?",
+            (week_number,),
+        ).fetchone()
+        rc_calls = int(existing["ringcentral_calls"] or 0) if existing else 0
+        sms_count = int(existing["outreach_sms"] or 0) if existing else 0
+        notes = (existing["notes"] or "") if existing else ""
+
+        total_calls = close_crm_calls + rc_calls
+        if rc_calls > 0:
+            ratio_am = am_crm / close_crm_calls if close_crm_calls else 0.5
+            rc_am = round(rc_calls * ratio_am)
+            am_calls = am_crm + rc_am
+            pm_calls = pm_crm + (rc_calls - rc_am)
+        else:
+            am_calls, pm_calls = am_crm, pm_crm
+
+        effectiveness_rate = round(100.0 * kps / total_calls, 2) if total_calls else 0.0
+
+        camp_row = conn.execute(
+            """SELECT
+                   COALESCE(SUM(CASE WHEN source='constantcontact' THEN sent_count ELSE 0 END), 0) AS cc_sent,
+                   COALESCE(SUM(CASE WHEN source='instantly' THEN sent_count ELSE 0 END), 0) AS inst_sent,
+                   COALESCE(SUM(opens_count), 0) AS opens_sum,
+                   COALESCE(SUM(clicks_count), 0) AS clicks_sum
+               FROM campaigns
+               WHERE COALESCE(NULLIF(substr(start_date, 1, 10), ''), substr(created_at, 1, 10)) BETWEEN ? AND ?""",
+            (monday.isoformat(), sunday.isoformat()),
+        ).fetchone()
+        cc_sent = int(camp_row["cc_sent"] or 0)
+        inst_sent = int(camp_row["inst_sent"] or 0)
+        total_outreach = cc_sent + inst_sent + sms_count
+        opens_sum = int(camp_row["opens_sum"] or 0)
+        clicks_sum = int(camp_row["clicks_sum"] or 0)
+        click_rate = round(100.0 * clicks_sum / total_outreach, 2) if total_outreach else 0.0
+
+        conn.execute(
+            """INSERT INTO weekly_team_kpis
+               (week_number, week_label, date_range, am_calls, pm_calls, close_crm_calls, ringcentral_calls,
+                total_calls, calls_goal, kps, kps_goal, effectiveness_rate, notes,
+                outreach_emails_cc, outreach_emails_instantly, outreach_sms, total_outreach,
+                opens_count, clicks_count, click_rate)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2000, ?, 125, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(week_number) DO UPDATE SET
+                   week_label=excluded.week_label,
+                   date_range=excluded.date_range,
+                   am_calls=excluded.am_calls,
+                   pm_calls=excluded.pm_calls,
+                   close_crm_calls=excluded.close_crm_calls,
+                   total_calls=excluded.total_calls,
+                   kps=excluded.kps,
+                   effectiveness_rate=excluded.effectiveness_rate,
+                   outreach_emails_cc=excluded.outreach_emails_cc,
+                   outreach_emails_instantly=excluded.outreach_emails_instantly,
+                   total_outreach=excluded.total_outreach,
+                   opens_count=excluded.opens_count,
+                   clicks_count=excluded.clicks_count,
+                   click_rate=excluded.click_rate""",
+            (
+                week_number, week_label, date_range, am_calls, pm_calls, close_crm_calls, rc_calls,
+                total_calls, kps, effectiveness_rate, notes,
+                cc_sent, inst_sent, sms_count, total_outreach, opens_sum, clicks_sum, click_rate,
+            ),
+        )
+
+    db.save_agent_kpis(week_number, res.get("per_user") or [])
+    db.prune_old_weekly_kpis(keep=4)
+    return f"Weekly KPIs (W{week_number}): {total_calls} llamadas, {kps} KPs (4 semanas activas)"
+
+
 def run_all():
     """Ejecuta todas las fuentes. Devuelve lista de mensajes."""
     if not _lock.acquire(blocking=False):
@@ -293,6 +397,7 @@ def run_all():
             ("constantcontact", sync_constantcontact_campaigns),
             ("instantly", sync_instantly_campaigns),
             ("gmail", sync_gmail_campaigns),
+            ("weekly_kpis", sync_weekly_close_kpis),
         )
         for source, fn in sources:
             try:

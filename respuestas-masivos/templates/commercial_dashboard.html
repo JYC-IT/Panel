@@ -1340,5 +1340,14 @@ function filterCommercialTable() {
     }
   }
 }
+
+// Auto-actualización del panel de llamadas y KPIs cada 5 minutos (sin interrumpir si el usuario está escribiendo)
+setInterval(function() {
+  const active = document.activeElement;
+  const isTyping = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
+  if (!isTyping) {
+    window.location.reload();
+  }
+}, 300000);
 </script>
 {% endblock %}

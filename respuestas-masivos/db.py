@@ -514,10 +514,32 @@ def _seed_weekly_kpis(conn):
            VALUES (?, ?, ?, ?, ?, ?)""",
         w27_agents,
     )
+    prune_old_weekly_kpis(keep=4, conn=conn)
 
 
-def get_weekly_kpis(limit=6):
-    """Retorna las últimas N semanas registradas en orden cronológico (por defecto las últimas 6 semanas)."""
+def prune_old_weekly_kpis(keep=4, conn=None):
+    """Mantiene únicamente las últimas N semanas en los reportes semanales de KPIs."""
+    def _do_prune(c):
+        rows = c.execute(
+            "SELECT week_number FROM weekly_team_kpis ORDER BY week_number DESC LIMIT ?",
+            (keep,),
+        ).fetchall()
+        keep_weeks = [r["week_number"] for r in rows]
+        if not keep_weeks:
+            return
+        placeholders = ",".join("?" * len(keep_weeks))
+        c.execute(f"DELETE FROM weekly_team_kpis WHERE week_number NOT IN ({placeholders})", keep_weeks)
+        c.execute(f"DELETE FROM weekly_agent_kpis WHERE week_number NOT IN ({placeholders})", keep_weeks)
+
+    if conn is not None:
+        _do_prune(conn)
+    else:
+        with get_conn() as local_conn:
+            _do_prune(local_conn)
+
+
+def get_weekly_kpis(limit=4):
+    """Retorna las últimas N semanas registradas en orden cronológico (por defecto las últimas 4 semanas)."""
     with get_conn() as conn:
         if limit:
             rows = conn.execute(
