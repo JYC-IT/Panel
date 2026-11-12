@@ -88,6 +88,12 @@ class _PgConnectionWrapper:
             if stmt:
                 self.execute(stmt)
 
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
 
 def _get_database_url() -> str:
     return (os.getenv("DATABASE_URL") or "").strip()
