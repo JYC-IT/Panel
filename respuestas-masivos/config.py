@@ -15,7 +15,7 @@ class Config:
     
     # Sincronización
     SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "15"))
-    LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "30"))
+    LOOKBACK_DAYS = int(os.getenv("LOOKBACK_DAYS", "42"))
     
     # Base de datos
     DB_PATH = os.path.join(BASE_DIR, "data.db")

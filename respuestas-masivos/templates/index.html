@@ -138,14 +138,13 @@
         <option value="zero">Sin envíos / Borradores (0)</option>
       </select>
 
-      <!-- Filtro Temporal -->
+      <!-- Filtro Temporal (Últimas 6 semanas) -->
       <select id="periodFilter" onchange="applyFilter(true)" class="custom-select">
-        <option value="all">Todo el histórico</option>
-        <option value="this_month">Mes Actual (Octubre 2026)</option>
+        <option value="all">Últimas 6 semanas (Todo)</option>
+        <option value="this_month">Mes Actual</option>
         <option value="last_30">Últimos 30 días</option>
-        <option value="last_90">Últimos 90 días</option>
-        <option value="2026">Año 2026</option>
-        <option value="2025">Año 2025 (Histórico)</option>
+        <option value="last_14">Últimos 14 días</option>
+        <option value="last_7">Últimos 7 días</option>
       </select>
 
       <!-- Filtro de Volumen -->
@@ -272,7 +271,7 @@
           </a>
           {% if c.match_subject %}
             <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
-              <span>✉️ “{{ c.match_subject }}”</span>
+              <span>“{{ c.match_subject }}”</span>
             </div>
           {% endif %}
         </td>
@@ -282,7 +281,7 @@
         <td>
           {% if c.reply_to_email %}
             <span class="badge-pill advisor" title="Buzón: {{ c.reply_to_email }}" style="font-size: 11.5px;">
-              👤 {{ c.reply_to_email }}
+              {{ c.reply_to_email }}
             </span>
           {% else %}
             <span style="color: var(--text-muted);">—</span>
@@ -304,7 +303,7 @@
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
             {% if c.clicks_count %}
               <span style="color: #0284c7; font-weight: 700; font-size: 13px;" title="{{ c.clicks_count }} clics en enlaces">
-                🎯 {{ "{:,}".format(c.clicks_count) }} clics
+                {{ "{:,}".format(c.clicks_count) }} clics
               </span>
             {% endif %}
             {% if c.opens_count %}
@@ -324,7 +323,7 @@
               </span>
               {% if c.buyers_count > 0 %}
                 <span class="badge-pill intent-buy" style="font-size: 10px; padding: 1px 6px;" title="{{ c.buyers_count }} prospectos con alta intención de compra">
-                  🟢 {{ c.buyers_count }} Comprador{% if c.buyers_count > 1 %}es{% endif %}
+                  {{ c.buyers_count }} Comprador{% if c.buyers_count > 1 %}es{% endif %}
                 </span>
               {% endif %}
             {% else %}
@@ -435,7 +434,7 @@
 <!-- LÓGICA DE FILTRADO AVANZADO, ORDENAMIENTO Y PAGINACIÓN -->
 <script>
 var currentPage = 1;
-var pageSize = 10;
+var pageSize = 20;
 var matchingRows = [];
 var currentSort = { col: 'date', asc: false };
 
@@ -577,24 +576,17 @@ function applyFilter(resetPage) {
     } else if (sentFilter === "zero") {
       matchesSent = (rowSent === 0);
     }
-      matchesSent = (rowReplies > 0 || rowClicks > 0);
-    } else if (sentFilter === "zero") {
-      matchesSent = (rowSent === 0);
-    }
 
-    // 5. Filtro de Período Temporal
+    // 5. Filtro de Período Temporal (Últimas 6 semanas)
     var matchesPeriod = true;
     if (periodFilter === "this_month") {
-      matchesPeriod = rowDate.indexOf("2026-10") === 0;
-    } else if (periodFilter === "2026") {
-      matchesPeriod = rowDate.indexOf("2026") === 0;
-    } else if (periodFilter === "2025") {
-      matchesPeriod = rowDate.indexOf("2025") === 0;
-    } else if (periodFilter === "last_30" || periodFilter === "last_90") {
+      var currentYm = new Date().toISOString().slice(0, 7);
+      matchesPeriod = rowDate.indexOf(currentYm) === 0;
+    } else if (periodFilter === "last_7" || periodFilter === "last_14" || periodFilter === "last_30") {
       if (!rowDate) {
         matchesPeriod = false;
       } else {
-        var days = (periodFilter === "last_30") ? 30 : 90;
+        var days = (periodFilter === "last_7") ? 7 : ((periodFilter === "last_14") ? 14 : 30);
         var d = new Date(rowDate);
         var now = new Date();
         var diffDays = (now - d) / (1000 * 60 * 60 * 24);
@@ -761,7 +753,7 @@ applyFilter(true);
   <div style="background:white; border-radius:14px; max-width:540px; width:92%; padding:26px; max-height:90vh; overflow-y:auto; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
       <div>
-        <h3 style="margin:0; font-size:18px; font-weight:800; color:var(--text-main);">➕ Registrar Campaña Masiva</h3>
+        <h3 style="margin:0; font-size:18px; font-weight:800; color:var(--text-main);">Registrar Campaña Masiva</h3>
         <p style="margin:3px 0 0; font-size:12.5px; color:var(--text-secondary);">Ingresa campañas enviadas recientemente si están pendientes de sincronización.</p>
       </div>
       <button type="button" style="border:0; background:none; font-size:22px; cursor:pointer; color:var(--text-muted);" onclick="closeModal('newCampaignModal')">✕</button>

@@ -1,5 +1,6 @@
 """Rutas principales para campañas de email masivo, respuestas, clics e integraciones."""
 import csv
+from datetime import date, timedelta
 import io
 import os
 from flask import Response, abort, flash, redirect, render_template, request, url_for
@@ -47,19 +48,29 @@ def _get_campaign(cid):
 def register_campaign_routes(app):
     @app.route("/")
     def index():
+        cutoff_date = (date.today() - timedelta(days=42)).isoformat()
+        where_6w = "WHERE COALESCE(NULLIF(substr(c.start_date, 1, 10), ''), substr(c.created_at, 1, 10)) >= ?"
         with db.get_conn() as conn:
-            rows = [dict(r) for r in conn.execute(STATS_SQL.format(where=""))]
+            rows = [dict(r) for r in conn.execute(STATS_SQL.format(where=where_6w), (cutoff_date,))]
             last_syncs = [dict(r) for r in conn.execute("SELECT * FROM sync_log ORDER BY id DESC LIMIT 4")]
             total_unique = conn.execute(
-                "SELECT COUNT(DISTINCT from_email) FROM replies WHERE is_auto = 0").fetchone()[0]
+                """SELECT COUNT(DISTINCT r.from_email)
+                   FROM replies r
+                   JOIN campaigns c ON c.id = r.campaign_id
+                   WHERE r.is_auto = 0
+                     AND COALESCE(NULLIF(substr(c.start_date, 1, 10), ''), substr(c.created_at, 1, 10)) >= ?""",
+                (cutoff_date,),
+            ).fetchone()[0]
             advisors = [
                 r[0] for r in conn.execute(
                     """SELECT DISTINCT reply_to_email FROM campaigns
                        WHERE reply_to_email IS NOT NULL AND reply_to_email != ''
+                       AND COALESCE(NULLIF(substr(start_date, 1, 10), ''), substr(created_at, 1, 10)) >= ?
                        AND reply_to_email NOT LIKE '%ccordoba%'
                        AND reply_to_email NOT LIKE '%rjones%'
                        AND reply_to_email NOT LIKE '%royjones%'
-                       ORDER BY reply_to_email"""
+                       ORDER BY reply_to_email""",
+                    (cutoff_date,),
                 ).fetchall()
             ]
         for r in rows:
@@ -107,7 +118,7 @@ def register_campaign_routes(app):
                 match_subject=subject,
                 reply_to_email=reply_to_email
             )
-            flash(f"✅ Campaña «{name}» registrada correctamente ({source.upper()}).", "ok")
+            flash(f"Campaña «{name}» registrada correctamente ({source.upper()}).", "ok")
         except Exception as e:
             flash(f"Error al registrar la campaña: {e}", "error")
 
