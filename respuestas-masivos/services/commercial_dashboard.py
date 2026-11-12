@@ -609,6 +609,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         kp_calls = []
 
         local_tz = timezone(timedelta(hours=-5))
+        now_local = datetime.now(local_tz)
+        today_str = now_local.strftime("%Y-%m-%d")
 
         try:
             skip = 0
@@ -716,10 +718,75 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                     dur1 = timedelta(seconds=c1.get("duration") or 0)
                     end1 = dt1 + dur1
 
-                    # Excluir cualquier intervalo que cruce la ventana de almuerzo (11:50 AM a 1:00 PM).
+                    # Caso especial: El intervalo cruza la ventana de almuerzo (11:50 AM a 1:00 PM)
                     lunch_start_dt = datetime.combine(end1.date(), dt_time(11, 50), local_tz)
                     lunch_end_dt = datetime.combine(end1.date(), dt_time(13, 0), local_tz)
                     if end1 < lunch_end_dt and dt2 > lunch_start_dt:
+                        # 1. Tramo antes de almuerzo (si cortó >= 10m antes de las 11:50 AM)
+                        if end1 < lunch_start_dt:
+                            gap_pre = round((lunch_start_dt - end1).total_seconds() / 60.0, 1)
+                            if gap_pre >= 10.0:
+                                raw_human = f"{int(gap_pre // 60)}h {int(gap_pre % 60):02d}m" if gap_pre >= 60 else f"{int(gap_pre)} min"
+                                sev = "Critical" if gap_pre >= 60 else "Warning" if gap_pre >= 30 else "Minor"
+                                ptype = f"Corte antes de Almuerzo ({'Crítica >1h' if gap_pre >= 60 else '30-60m' if gap_pre >= 30 else '10-30m'})"
+                                u_name = c1.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor")
+                                gap_item_pre = {
+                                    "user_id": uid,
+                                    "user_name": u_name,
+                                    "date": day_str,
+                                    "gap_minutes": gap_pre,
+                                    "raw_minutes": gap_pre,
+                                    "raw_human": raw_human,
+                                    "discounted_minutes": 0.0,
+                                    "discounted_human": "",
+                                    "gap_human": raw_human,
+                                    "from_time": end1.strftime("%I:%M %p"),
+                                    "to_time": lunch_start_dt.strftime("%I:%M %p"),
+                                    "pause_type": ptype,
+                                    "severity": sev,
+                                    "is_lunch": False,
+                                    "phone_before": c1.get("remote_phone_formatted") or c1.get("remote_phone") or "N/A",
+                                    "phone_after": "Salida a Almuerzo (11:50 AM)",
+                                    "lead_before": c1.get("lead_name") or c1.get("lead_id") or "Sin Lead",
+                                    "lead_after": "Almuerzo programado 11:50 AM",
+                                    "lead_id_before": c1.get("lead_id"),
+                                    "lead_id_after": None,
+                                }
+                                gaps_by_user[uid].append(gap_item_pre)
+                                all_gaps.append(gap_item_pre)
+
+                        # 2. Tramo después de almuerzo (si regresó >= 10m después de la 1:00 PM)
+                        if dt2 > lunch_end_dt:
+                            gap_post = round((dt2 - lunch_end_dt).total_seconds() / 60.0, 1)
+                            if gap_post >= 10.0:
+                                raw_human = f"{int(gap_post // 60)}h {int(gap_post % 60):02d}m" if gap_post >= 60 else f"{int(gap_post)} min"
+                                sev = "Critical" if gap_post >= 60 else "Warning" if gap_post >= 30 else "Minor"
+                                ptype = f"Regreso Tardío de Almuerzo ({'Crítica >1h' if gap_post >= 60 else '30-60m' if gap_post >= 30 else '10-30m'})"
+                                u_name = c2.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor")
+                                gap_item_post = {
+                                    "user_id": uid,
+                                    "user_name": u_name,
+                                    "date": day_str,
+                                    "gap_minutes": gap_post,
+                                    "raw_minutes": gap_post,
+                                    "raw_human": raw_human,
+                                    "discounted_minutes": 0.0,
+                                    "discounted_human": "",
+                                    "gap_human": raw_human,
+                                    "from_time": lunch_end_dt.strftime("%I:%M %p"),
+                                    "to_time": dt2.strftime("%I:%M %p"),
+                                    "pause_type": ptype,
+                                    "severity": sev,
+                                    "is_lunch": False,
+                                    "phone_before": "Retorno de Almuerzo (01:00 PM)",
+                                    "phone_after": c2.get("remote_phone_formatted") or c2.get("remote_phone") or "N/A",
+                                    "lead_before": "Retorno programado 01:00 PM",
+                                    "lead_after": c2.get("lead_name") or c2.get("lead_id") or "Sin Lead",
+                                    "lead_id_before": None,
+                                    "lead_id_after": c2.get("lead_id"),
+                                }
+                                gaps_by_user[uid].append(gap_item_post)
+                                all_gaps.append(gap_item_post)
                         continue
 
                     eff_minutes, raw_diff_minutes, disc_minutes = get_effective_gap_minutes(end1, dt2, w_ranges)
@@ -763,6 +830,42 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         }
                         gaps_by_user[uid].append(gap_item)
                         all_gaps.append(gap_item)
+
+                # Si la última llamada del día fue antes de almuerzo y no hubo llamadas en la tarde
+                if ucalls:
+                    last_call_end = ucalls[-1][0] + timedelta(seconds=ucalls[-1][1].get("duration") or 0)
+                    lunch_start_dt = datetime.combine(last_call_end.date(), dt_time(11, 50), local_tz)
+                    if last_call_end < lunch_start_dt and (day_str < today_str or now_local >= lunch_start_dt):
+                        gap_pre = round((lunch_start_dt - last_call_end).total_seconds() / 60.0, 1)
+                        if gap_pre >= 10.0:
+                            raw_human = f"{int(gap_pre // 60)}h {int(gap_pre % 60):02d}m" if gap_pre >= 60 else f"{int(gap_pre)} min"
+                            sev = "Critical" if gap_pre >= 60 else "Warning" if gap_pre >= 30 else "Minor"
+                            ptype = f"Corte antes de Almuerzo ({'Crítica >1h' if gap_pre >= 60 else '30-60m' if gap_pre >= 30 else '10-30m'})"
+                            u_name = ucalls[-1][1].get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor")
+                            gap_item_pre = {
+                                "user_id": uid,
+                                "user_name": u_name,
+                                "date": day_str,
+                                "gap_minutes": gap_pre,
+                                "raw_minutes": gap_pre,
+                                "raw_human": raw_human,
+                                "discounted_minutes": 0.0,
+                                "discounted_human": "",
+                                "gap_human": raw_human,
+                                "from_time": last_call_end.strftime("%I:%M %p"),
+                                "to_time": lunch_start_dt.strftime("%I:%M %p"),
+                                "pause_type": ptype,
+                                "severity": sev,
+                                "is_lunch": False,
+                                "phone_before": ucalls[-1][1].get("remote_phone_formatted") or ucalls[-1][1].get("remote_phone") or "N/A",
+                                "phone_after": "Salida a Almuerzo (11:50 AM)",
+                                "lead_before": ucalls[-1][1].get("lead_name") or ucalls[-1][1].get("lead_id") or "Sin Lead",
+                                "lead_after": "Almuerzo programado 11:50 AM",
+                                "lead_id_before": ucalls[-1][1].get("lead_id"),
+                                "lead_id_after": None,
+                            }
+                            gaps_by_user[uid].append(gap_item_pre)
+                            all_gaps.append(gap_item_pre)
 
             # C. Cálculo de Checkpoints de Jornada: 1ra AM, Última AM, 1ra PM, Última PM
             all_daily_records = []
