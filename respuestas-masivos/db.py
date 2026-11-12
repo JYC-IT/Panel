@@ -170,6 +170,13 @@ def init_db():
                 analyzed_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_cid ON replies(campaign_id, is_auto)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_intent ON replies(campaign_id, intent)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_campaigns_source_sent ON campaigns(source, sent_count)")
@@ -623,3 +630,20 @@ def save_cached_leads(leads_map):
                     "INSERT INTO leads_cache (lead_id, display_name) VALUES (?, ?) ON CONFLICT(lead_id) DO UPDATE SET display_name=excluded.display_name",
                     (lid, name)
                 )
+
+
+def get_setting(key: str, default: str = "") -> str:
+    """Obtiene una configuración persistente desde SQLite."""
+    with get_conn() as conn:
+        row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row and row["value"] is not None else default
+
+
+def set_setting(key: str, value: str):
+    """Guarda o actualiza una configuración persistente en SQLite."""
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP""",
+            (key, value),
+        )

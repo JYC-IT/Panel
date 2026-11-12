@@ -33,7 +33,22 @@ def _get_headers(token: str):
 
 
 def save_tokens_to_env(access_token: str, refresh_token: str = None):
-    """Actualiza el archivo .env con los nuevos tokens para mantener la sesión."""
+    """Guarda los tokens en memoria, SQLite (compartido entre workers/Render) y .env si existe."""
+    import db
+
+    if access_token:
+        os.environ["CONSTANT_CONTACT_ACCESS_TOKEN"] = access_token
+        try:
+            db.set_setting("cc_access_token", access_token)
+        except Exception:
+            pass
+    if refresh_token:
+        os.environ["CONSTANT_CONTACT_REFRESH_TOKEN"] = refresh_token
+        try:
+            db.set_setting("cc_refresh_token", refresh_token)
+        except Exception:
+            pass
+
     env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
     if not os.path.exists(env_path):
         env_path = os.path.join(os.getcwd(), ".env")
@@ -62,10 +77,6 @@ def save_tokens_to_env(access_token: str, refresh_token: str = None):
             
         with open(env_path, "w", encoding="utf-8") as f:
             f.writelines(new_lines)
-            
-        os.environ["CONSTANT_CONTACT_ACCESS_TOKEN"] = access_token
-        if refresh_token:
-            os.environ["CONSTANT_CONTACT_REFRESH_TOKEN"] = refresh_token
     except Exception:
         pass
 
@@ -98,14 +109,26 @@ def exchange_code_for_tokens(code: str, redirect_uri: str):
 
 
 def get_access_token():
-    """Retorna un token válido. Si hay refresh token configurado y expiró, lo renueva."""
+    """Retorna un token válido. Prioriza tokens renovados/conectados en SQLite y luego .env/entorno."""
+    import db
     from dotenv import load_dotenv
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    load_dotenv(os.path.join(root_dir, ".env"), override=True)
-    token = os.getenv("CONSTANT_CONTACT_ACCESS_TOKEN", "").strip()
+    env_file = os.path.join(root_dir, ".env")
+    if os.path.exists(env_file):
+        load_dotenv(env_file, override=True)
+
+    db_token = ""
+    db_refresh = ""
+    try:
+        db_token = db.get_setting("cc_access_token", "").strip()
+        db_refresh = db.get_setting("cc_refresh_token", "").strip()
+    except Exception:
+        pass
+
+    token = db_token or os.getenv("CONSTANT_CONTACT_ACCESS_TOKEN", "").strip()
     client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip()
     client_secret = os.getenv("CONSTANT_CONTACT_CLIENT_SECRET", "").strip()
-    refresh_token = os.getenv("CONSTANT_CONTACT_REFRESH_TOKEN", "").strip()
+    refresh_token = db_refresh or os.getenv("CONSTANT_CONTACT_REFRESH_TOKEN", "").strip()
 
     # Si hay credenciales OAuth para renovar
     if refresh_token and client_id and client_secret:

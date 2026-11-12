@@ -225,9 +225,10 @@ def register_campaign_routes(app):
     @app.route("/connect-cc")
     @auth.admin_required
     def connect_constant_contact():
-        client_id = Config.CONSTANT_CONTACT_CLIENT_ID
+        from urllib.parse import quote
+        client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip() or Config.CONSTANT_CONTACT_CLIENT_ID
         if not client_id:
-            flash("Configura CONSTANT_CONTACT_CLIENT_ID en tu archivo .env para conectar con 1 clic.", "error")
+            flash("Configura CONSTANT_CONTACT_CLIENT_ID en las variables de entorno para conectar con 1 clic.", "error")
             return redirect(url_for("index"))
 
         scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
@@ -237,10 +238,10 @@ def register_campaign_routes(app):
         state_token = "cc_auth_state_secure_123"
         auth_url = (
             f"https://authz.constantcontact.com/oauth2/default/v1/authorize"
-            f"?client_id={client_id}"
-            f"&redirect_uri={redirect_uri}"
+            f"?client_id={quote(client_id, safe='')}"
+            f"&redirect_uri={quote(redirect_uri, safe='')}"
             f"&response_type=code"
-            f"&scope={scope.replace(' ', '%20')}"
+            f"&scope={quote(scope, safe='')}"
             f"&state={state_token}"
         )
         return redirect(auth_url)
