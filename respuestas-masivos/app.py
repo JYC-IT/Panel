@@ -22,6 +22,8 @@ def create_app():
         return (value or "")[:16].replace("T", " ")
 
     # Inicializar base de datos y usuario admin inicial si aplica
+    db_mode = "PostgreSQL (Neon)" if db._get_database_url() else "SQLite local"
+    print(f"[PanelAdmin] Base de datos activa: {db_mode}")
     db.init_db()
     auth.bootstrap_admin()
 

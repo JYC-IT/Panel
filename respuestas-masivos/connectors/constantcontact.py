@@ -33,8 +33,21 @@ def _get_headers(token: str):
 
 
 def save_tokens_to_env(access_token: str, refresh_token: str = None):
-    """Guarda los tokens en memoria, SQLite (compartido entre workers/Render) y .env si existe."""
+    """Guarda los tokens en memoria, SQLite/PostgreSQL (compartido entre workers/Render) y .env si existe."""
     import db
+
+    cid = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip()
+    csec = os.getenv("CONSTANT_CONTACT_CLIENT_SECRET", "").strip()
+    if cid:
+        try:
+            db.set_setting("cc_client_id", cid)
+        except Exception:
+            pass
+    if csec:
+        try:
+            db.set_setting("cc_client_secret", csec)
+        except Exception:
+            pass
 
     if access_token:
         os.environ["CONSTANT_CONTACT_ACCESS_TOKEN"] = access_token
@@ -83,8 +96,9 @@ def save_tokens_to_env(access_token: str, refresh_token: str = None):
 
 def exchange_code_for_tokens(code: str, redirect_uri: str):
     """Intercambia un authorization code por access_token y refresh_token."""
-    client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip()
-    client_secret = os.getenv("CONSTANT_CONTACT_CLIENT_SECRET", "").strip()
+    import db
+    client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip() or db.get_setting("cc_client_id", "").strip()
+    client_secret = os.getenv("CONSTANT_CONTACT_CLIENT_SECRET", "").strip() or db.get_setting("cc_client_secret", "").strip()
     if not client_id or not client_secret:
         raise ValueError("Falta CONSTANT_CONTACT_CLIENT_ID o CONSTANT_CONTACT_CLIENT_SECRET en .env")
 
@@ -119,15 +133,19 @@ def get_access_token():
 
     db_token = ""
     db_refresh = ""
+    db_client_id = ""
+    db_client_secret = ""
     try:
         db_token = db.get_setting("cc_access_token", "").strip()
         db_refresh = db.get_setting("cc_refresh_token", "").strip()
+        db_client_id = db.get_setting("cc_client_id", "").strip()
+        db_client_secret = db.get_setting("cc_client_secret", "").strip()
     except Exception:
         pass
 
     token = db_token or os.getenv("CONSTANT_CONTACT_ACCESS_TOKEN", "").strip()
-    client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip()
-    client_secret = os.getenv("CONSTANT_CONTACT_CLIENT_SECRET", "").strip()
+    client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip() or db_client_id
+    client_secret = os.getenv("CONSTANT_CONTACT_CLIENT_SECRET", "").strip() or db_client_secret
     refresh_token = db_refresh or os.getenv("CONSTANT_CONTACT_REFRESH_TOKEN", "").strip()
 
     # Si hay credenciales OAuth para renovar

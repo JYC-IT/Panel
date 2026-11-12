@@ -218,6 +218,11 @@ def sync_constantcontact_campaigns():
                     except Exception:
                         pass
 
+    try:
+        sync_weekly_close_kpis()
+    except Exception:
+        pass
+
     return f"Constant Contact: {len(remote)} campañas sincronizadas ({added} actualizadas/nuevas)"
 
 
@@ -316,7 +321,9 @@ def sync_weekly_close_kpis():
 
     with db.get_conn() as conn:
         existing = conn.execute(
-            "SELECT ringcentral_calls, outreach_sms, notes FROM weekly_team_kpis WHERE week_number = ?",
+            """SELECT ringcentral_calls, outreach_sms, notes, outreach_emails_cc, outreach_emails_instantly,
+                      opens_count, clicks_count, click_rate
+               FROM weekly_team_kpis WHERE week_number = ?""",
             (week_number,),
         ).fetchone()
         rc_calls = int(existing["ringcentral_calls"] or 0) if existing else 0
@@ -346,10 +353,21 @@ def sync_weekly_close_kpis():
         ).fetchone()
         cc_sent = int(camp_row["cc_sent"] or 0)
         inst_sent = int(camp_row["inst_sent"] or 0)
-        total_outreach = cc_sent + inst_sent + sms_count
         opens_sum = int(camp_row["opens_sum"] or 0)
         clicks_sum = int(camp_row["clicks_sum"] or 0)
-        click_rate = round(100.0 * clicks_sum / total_outreach, 2) if total_outreach else 0.0
+
+        # Si la consulta de campañas devuelve 0 pero ya existía un valor registrado (manual o previo), conservarlo
+        if cc_sent == 0 and existing and int(existing["outreach_emails_cc"] or 0) > 0:
+            cc_sent = int(existing["outreach_emails_cc"])
+        if inst_sent == 0 and existing and int(existing["outreach_emails_instantly"] or 0) > 0:
+            inst_sent = int(existing["outreach_emails_instantly"])
+        if opens_sum == 0 and existing and int(existing["opens_count"] or 0) > 0:
+            opens_sum = int(existing["opens_count"])
+        if clicks_sum == 0 and existing and int(existing["clicks_count"] or 0) > 0:
+            clicks_sum = int(existing["clicks_count"])
+
+        total_outreach = cc_sent + inst_sent + sms_count
+        click_rate = round(100.0 * clicks_sum / total_outreach, 2) if total_outreach else (float(existing["click_rate"] or 0.0) if existing else 0.0)
 
         conn.execute(
             """INSERT INTO weekly_team_kpis

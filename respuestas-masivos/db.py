@@ -102,7 +102,14 @@ class _PgConnectionWrapper:
 
 
 def _get_database_url() -> str:
-    return (os.getenv("DATABASE_URL") or "").strip()
+    url = (
+        os.getenv("DATABASE_URL")
+        or os.getenv("DATABASE_UR")
+        or os.getenv("POSTGRES_URL")
+        or os.getenv("POSTGRESQL_URL")
+        or ""
+    ).strip()
+    return url
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS campaigns (
@@ -295,6 +302,18 @@ def init_db():
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        cc_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip()
+        cc_sec = os.getenv("CONSTANT_CONTACT_CLIENT_SECRET", "").strip()
+        if cc_id:
+            conn.execute(
+                "INSERT INTO app_settings (key, value, updated_at) VALUES ('cc_client_id', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (cc_id,),
+            )
+        if cc_sec:
+            conn.execute(
+                "INSERT INTO app_settings (key, value, updated_at) VALUES ('cc_client_secret', ?, CURRENT_TIMESTAMP) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (cc_sec,),
+            )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_cid ON replies(campaign_id, is_auto)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_replies_intent ON replies(campaign_id, intent)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_campaigns_source_sent ON campaigns(source, sent_count)")
