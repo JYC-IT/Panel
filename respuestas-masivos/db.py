@@ -362,29 +362,45 @@ def log_sync(source, ok, message):
 
 
 def _seed_weekly_kpis(conn):
-    """Inicializa los datos históricos de las últimas 8 semanas de la presentación de resultados."""
-    count = conn.execute("SELECT COUNT(*) FROM weekly_team_kpis").fetchone()[0]
-    if count > 0:
-        return
-
+    """Inicializa los datos históricos semanales hasta la Semana 27 (usa INSERT OR IGNORE para no sobrescribir datos)."""
     weeks_data = [
-        (17, "Week 17*", "Aug 24–28", 534, 516, 1050, 2400, 112, 150, 10.67, "Festivo", 128000, 2900, 0, 130900, 50300, 16.2),
-        (18, "Week 18", "Aug 31–Sep 4", 593, 516, 1109, 2400, 122, 150, 11.00, "Semana normal", 137000, 313, 519, 137832, 40400, 16.2),
-        (19, "Week 19*", "Sep 7–11", 617, 373, 990, 2400, 68, 150, 6.87, "Salida Sophia / 1 Semana sin Mauro", 34000, 0, 0, 34000, 5930, 0.0),
-        (20, "Week 20*", "Sep 14–18", 550, 774, 1324, 2400, 59, 150, 4.46, "Festivo Lunes", 166000, 0, 23, 166023, 63700, 17.4),
-        (21, "Week 21*", "Sep 21–25", 537, 337, 874, 2400, 39, 150, 4.46, "Viaje Hernan y Sebastián", 78000, 0, 0, 78000, 46300, 38.2),
-        (22, "Week 22*", "Sep 28–Oct 2", 568, 409, 977, 2400, 92, 150, 9.42, "Viaje Sebastián", 43000, 0, 0, 43000, 22000, 39.0),
-        (23, "Week 23*", "Oct 5–9", 405, 388, 793, 2400, 56, 150, 7.06, "Sebastián no estuvo 2 días", 115000, 0, 0, 115000, 60700, 9.5),
-        (24, "Week 24*", "Oct 12–16", 431, 372, 803, 2400, 79, 150, 9.84, "Rodrigo no estuvo 2 dias", 115000, 0, 0, 115000, 45100, 26.4),
+        (17, "Week 17*", "Aug 24–28", 534, 516, 1050, 2400, 112, 150, 10.67, "Festivo", 128000, 2900, 0, 130900, 50300, 16.2, 0, 0, 0),
+        (18, "Week 18", "Aug 31–Sep 4", 593, 516, 1109, 2400, 122, 150, 11.00, "Semana normal", 137000, 313, 519, 137832, 40400, 16.2, 0, 0, 0),
+        (19, "Week 19*", "Sep 7–11", 617, 373, 990, 2400, 68, 150, 6.87, "Salida Sophia / 1 Semana sin Mauro", 34000, 0, 0, 34000, 5930, 0.0, 0, 0, 0),
+        (20, "Week 20*", "Sep 14–18", 550, 774, 1324, 2400, 59, 150, 4.46, "Festivo Lunes", 166000, 0, 23, 166023, 63700, 17.4, 0, 0, 0),
+        (21, "Week 21*", "Sep 21–25", 537, 337, 874, 2400, 39, 150, 4.46, "Viaje Hernan y Sebastián", 78000, 0, 0, 78000, 46300, 38.2, 0, 0, 0),
+        (22, "Week 22*", "Sep 28–Oct 2", 568, 409, 977, 2400, 92, 150, 9.42, "Viaje Sebastián", 43000, 0, 0, 43000, 22000, 39.0, 0, 0, 0),
+        (23, "Week 23*", "Oct 5–9", 405, 388, 793, 2400, 56, 150, 7.06, "Sebastián no estuvo 2 días", 115000, 0, 0, 115000, 60700, 9.5, 0, 0, 5767),
+        (24, "Week 24*", "Oct 12–16", 431, 372, 803, 2400, 79, 150, 9.84, "Rodrigo no estuvo 2 dias", 115000, 0, 0, 115000, 45100, 26.4, 71, 732, 11906),
+        (25, "Week 25*", "Oct 19 - 23", 203, 432, 635, 2000, 51, 125, 8.03, "Hernan no estuvo", 135842, 0, 2130, 137972, 44067, 14.7, 23, 612, 6478),
+        (26, "Week 26*", "Oct 26 - 30", 373, 283, 656, 2000, 57, 125, 8.69, "", 109982, 174, 199, 110355, 31886, 1.57, 0, 656, 501),
+        (27, "Week 27*", "Nov 2 - 6", 238, 384, 622, 2000, 66, 125, 10.61, "+10 EKP - Opens reales humanos sin bots", 169842, 317, 0, 170159, 32596, 4.35, 0, 622, 7409),
     ]
 
     conn.executemany(
         """INSERT OR IGNORE INTO weekly_team_kpis
            (week_number, week_label, date_range, am_calls, pm_calls, total_calls, calls_goal,
             kps, kps_goal, effectiveness_rate, notes, outreach_emails_cc, outreach_emails_instantly,
-            outreach_sms, total_outreach, opens_count, click_rate)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            outreach_sms, total_outreach, opens_count, click_rate, ringcentral_calls, close_crm_calls, clicks_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         weeks_data,
+    )
+
+    w27_agents = [
+        (27, "user_7cXDrv9AKnoVTSOnXBJo2oYXmUrFRDG40sIYVhmDwHA", "Juan Abuchaibe", 149, 8, 5.37),
+        (27, "user_QrLrTvgnGNQRS7AMKX2EuCFrZKvqgKmIUloYX1TkRQd", "Mariana Polanco", 128, 15, 11.72),
+        (27, "user_piUkoIPqMs7i1Lm3vdc2c2pE3lPjU3cCRvrmvxMonGy", "Julian Prado", 98, 6, 6.12),
+        (27, "user_fFN8XRtibi7NPtCPiZSM6Z5cHmw87PYKDJ8Xg6tYv4D", "Roy Jones", 90, 18, 20.0),
+        (27, "user_n1y0yxmKit3rxkJlxhKZXFxEvG4y4G7C4cr4GPypUTx", "Sebastian Jordan", 75, 0, 0.0),
+        (27, "user_TcBTZtqa1UlOlFQyDlhLJzEywClWo3CTQwXt2OREF2e", "Hernan Bonilla", 70, 19, 27.14),
+        (27, "user_ESOupvkhojB5X4SkkJ20Nv05U2Klc0ImoRgS4Hwbwms", "Juan Cordoba", 12, 0, 0.0),
+        (27, "user_BZhhrwAL2irTmKaPIntbraEWoINZrcYpKlGUUXsfwcV", "Juan Arango", 0, 0, 0.0),
+    ]
+    conn.executemany(
+        """INSERT OR IGNORE INTO weekly_agent_kpis
+           (week_number, user_id, name, calls, kps, effectiveness)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        w27_agents,
     )
 
 
