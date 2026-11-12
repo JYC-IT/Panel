@@ -261,13 +261,19 @@
 
   // Compatibilidad universal con extensiones de previsualización en VS Code (Mobile View, Simple Browser, Live Preview)
   (function() {
+    const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/logout';
+    const hasLoggedOut = window.location.search.includes('logged_out=1');
+    if (hasLoggedOut || window.location.pathname === '/logout') {
+      try { localStorage.removeItem('jyc_preview_token'); } catch(e){}
+    }
+
     const serverToken = "{{ current_auth_token or '' }}";
     if (serverToken) {
       try { localStorage.setItem('jyc_preview_token', serverToken); } catch(e){}
     }
-    const token = serverToken || (function() {
+    const token = serverToken || (isAuthPage ? '' : (function() {
       try { return localStorage.getItem('jyc_preview_token') || ''; } catch(e){ return ''; }
-    })();
+    })());
 
     if (token) {
       // Interceptar clics en enlaces locales para no perder la sesión en navegadores/webviews con cookies de terceros bloqueadas

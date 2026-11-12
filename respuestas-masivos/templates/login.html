@@ -59,21 +59,9 @@
 
     <script>
       (function() {
-        // Si el usuario ya tenía un token guardado en el navegador/webview y visita /login (sin haber cerrado sesión explícitamente),
-        // ofrecer enlace directo para restaurar su sesión
-        const hasLoggedOut = window.location.href.includes('logout');
+        const hasLoggedOut = window.location.href.includes('logout') || window.location.search.includes('logged_out=1');
         if (hasLoggedOut) {
           try { localStorage.removeItem('jyc_preview_token'); } catch(e){}
-        } else {
-          try {
-            const saved = localStorage.getItem('jyc_preview_token');
-            if (saved) {
-              const previewLink = document.querySelector('a[href*="preview-login"]');
-              if (previewLink) {
-                previewLink.href = "/?auth_token=" + encodeURIComponent(saved);
-              }
-            }
-          } catch(e){}
         }
       })();
     </script>

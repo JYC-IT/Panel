@@ -137,7 +137,11 @@ def init_app(app):
 
         # Fallback para webviews / extensiones iframe de VS Code (Mobile View, Simple Browser, etc.)
         # donde Chromium bloquea las cookies de terceros de localhost en iframes.
-        token = (
+        # Nunca auto-autenticar con token viejo cuando el usuario está enviando un login nuevo o cerrando sesión.
+        is_auth_switch = request.endpoint in ("logout", "preview_login") or (
+            request.endpoint == "login" and request.method == "POST"
+        )
+        token = None if is_auth_switch else (
             request.args.get("auth_token")
             or request.headers.get("X-Auth-Token")
             or request.cookies.get("auth_token")

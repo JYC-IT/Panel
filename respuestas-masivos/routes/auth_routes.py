@@ -6,8 +6,8 @@ import auth
 def register_auth_routes(app):
     @app.route("/login", methods=["GET", "POST"])
     def login():
-        # Si ya está autenticado, continuar al panel principal
-        if getattr(g, "user", None):
+        # Si ya está autenticado y solo abre GET /login, continuar al panel principal
+        if request.method == "GET" and getattr(g, "user", None):
             return redirect(url_for("index"))
 
         if request.method == "POST":
@@ -17,13 +17,17 @@ def register_auth_routes(app):
 
             user = auth.verify(username, password)
             if user:
+                session.clear()
                 session["user_id"] = user["id"]
                 token = auth.generate_auth_token(user["id"])
                 flash(f"¡Bienvenido, {user['name']}!", "ok")
 
-                # Incluir auth_token en la redirección para navegadores y webviews de VS Code
-                sep = "&" if "?" in next_url else "?"
-                target = f"{next_url}{sep}auth_token={token}" if "auth_token=" not in next_url else next_url
+                # Limpiar cualquier auth_token previo en next_url y adjuntar el token del usuario nuevo
+                from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+                parsed = urlparse(next_url)
+                clean_qs = [(k, v) for k, v in parse_qsl(parsed.query) if k != "auth_token"]
+                clean_qs.append(("auth_token", token))
+                target = urlunparse(parsed._replace(query=urlencode(clean_qs)))
                 resp = redirect(target)
                 resp.set_cookie("auth_token", token, max_age=86400 * 30, httponly=True, samesite="Lax")
                 return resp
@@ -50,7 +54,7 @@ def register_auth_routes(app):
     def logout():
         session.clear()
         flash("Has cerrado sesión.", "ok")
-        resp = redirect(url_for("login"))
+        resp = redirect(url_for("login", logged_out="1"))
         resp.delete_cookie("auth_token")
         return resp
 
