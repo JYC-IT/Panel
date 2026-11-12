@@ -1,4 +1,5 @@
 """Rutas para reportes semanales, KPIs comerciales y rendimiento."""
+from datetime import date, timedelta
 from flask import flash, redirect, render_template, request, url_for
 import auth
 import db
@@ -93,7 +94,7 @@ def register_report_routes(app):
 
     @app.route("/weekly-report")
     def weekly_report():
-        since = request.args.get("since") or "2026-09-14"
+        since = request.args.get("since") or (date.today() - timedelta(days=42)).isoformat()
         selected_week = request.args.get("week", type=int)
         business_summary, business_totals = db.get_business_summary(since_date=since)
         weekly_kpis = db.get_weekly_kpis(limit=6)

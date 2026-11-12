@@ -504,17 +504,18 @@ def classify_campaign(c):
     return business, intent
 
 
-def get_business_summary(since_date="2026-09-14"):
+def get_business_summary(since_date=None):
     """
     Genera el desglose ejecutivo por Línea de Negocio y Tipo (Compras vs Ventas)
-    para las últimas 6 semanas (desde 2026-09-14 / Semana 20 hasta la Semana 25).
+    estrictamente por campaña para las últimas 6 semanas (42 días).
     """
+    from datetime import date, timedelta
+    if not since_date:
+        since_date = (date.today() - timedelta(days=42)).isoformat()
+
     with get_conn() as conn:
-        where_clause = ""
-        params = []
-        if since_date:
-            where_clause = "WHERE c.start_date >= ? OR c.start_date IS NULL"
-            params = [since_date]
+        where_clause = "WHERE COALESCE(NULLIF(substr(c.start_date, 1, 10), ''), substr(c.created_at, 1, 10)) >= ?"
+        params = [since_date]
 
         rows = conn.execute(f"""
             SELECT c.*,
@@ -526,15 +527,15 @@ def get_business_summary(since_date="2026-09-14"):
         """, params).fetchall()
 
     data = {
-        "Medical": {"business": "Medical", "icon": "🩺", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
-        "Machinery": {"business": "Machinery", "icon": "⚙️", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
-        "Puertos": {"business": "Puertos", "icon": "🚢", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
-        "Multi Industria": {"business": "Multi Industria", "icon": "🏗️", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
+        "Medical": {"business": "Medical", "icon": "", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
+        "Machinery": {"business": "Machinery", "icon": "", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
+        "Puertos": {"business": "Puertos", "icon": "", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
+        "Multi Industria": {"business": "Multi Industria", "icon": "", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0},
     }
 
     totals = {
         "business": "TOTAL CONSOLIDADO",
-        "icon": "📊",
+        "icon": "",
         "campaigns": 0,
         "compras": 0,
         "ventas": 0,
@@ -548,7 +549,7 @@ def get_business_summary(since_date="2026-09-14"):
     for r in rows:
         b, intent = classify_campaign(r)
         if b not in data:
-            data[b] = {"business": b, "icon": "📦", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0}
+            data[b] = {"business": b, "icon": "", "campaigns": 0, "compras": 0, "ventas": 0, "sent": 0, "opens": 0, "clicks": 0, "bounces": 0, "replies": 0}
         d = data[b]
 
         sent = r["sent_count"] or 0
