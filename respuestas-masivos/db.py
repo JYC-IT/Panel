@@ -16,7 +16,7 @@ class _HybridRow(dict):
         return super().__getitem__(key)
 
 
-def _translate_sql_for_pg(sql: str) -> str:
+def _translate_sql_for_pg(sql: str, escape_pct: bool = False) -> str:
     """Convierte SQL estilo SQLite (placeholders ?, AUTOINCREMENT, INSERT OR IGNORE) a PostgreSQL."""
     s = re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT", "SERIAL PRIMARY KEY", sql, flags=re.IGNORECASE)
 
@@ -27,6 +27,7 @@ def _translate_sql_for_pg(sql: str) -> str:
             s = s.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
 
     # Reemplazar ? por %s únicamente fuera de literales entre comillas simples
+    # y escapar % literales como %% cuando hay parámetros para psycopg
     out = []
     in_single = False
     i = 0
@@ -40,6 +41,8 @@ def _translate_sql_for_pg(sql: str) -> str:
                 i += 2
                 continue
             in_single = not in_single
+        elif ch == "%" and escape_pct:
+            out.append("%%")
         elif ch == "?" and not in_single:
             out.append("%s")
         else:
@@ -67,13 +70,16 @@ class _PgConnectionWrapper:
         stripped = (sql or "").strip()
         if stripped.upper().startswith("PRAGMA"):
             return _PgDummyCursor()
-        pg_sql = _translate_sql_for_pg(stripped)
-        if params is not None and not isinstance(params, (tuple, dict)):
+        has_params = params is not None and len(params) > 0 if hasattr(params, "__len__") else params is not None
+        pg_sql = _translate_sql_for_pg(stripped, escape_pct=has_params)
+        if not has_params:
+            params = None
+        elif not isinstance(params, (tuple, dict)):
             params = tuple(params)
         return self._conn.execute(pg_sql, params)
 
     def executemany(self, sql, seq_of_params):
-        pg_sql = _translate_sql_for_pg(sql)
+        pg_sql = _translate_sql_for_pg(sql, escape_pct=True)
         with self._conn.cursor() as cur:
             cur.executemany(pg_sql, seq_of_params)
             return cur
