@@ -29,7 +29,7 @@ DAILY_GOAL_CALLS = 60          # Mínimo 60 llamadas diarias
 DAILY_GOAL_TOTAL_KPS = 10      # Mínimo 10 KPs diarios
 DAILY_GOAL_CALL_KPS = 5        # La mitad de esos KPs deben ser llamadas (mínimo 5)
 
-# 6 Asesores Comerciales Marcados Oficiales en el Orden Requerido por Hernán
+# Todos los asesores comerciales activos visibles para Administrador
 COMMERCIAL_TEAM = [
     {"id": "user_TcBTZtqa1UlOlFQyDlhLJzEywClWo3CTQwXt2OREF2e", "name": "Hernan Bonilla", "email": "hbonilla@jycexports.com"},
     {"id": "user_QrLrTvgnGNQRS7AMKX2EuCFrZKvqgKmIUloYX1TkRQd", "name": "Mariana Polanco", "email": "mpolanco@jycexports.com"},
@@ -37,7 +37,18 @@ COMMERCIAL_TEAM = [
     {"id": "user_7cXDrv9AKnoVTSOnXBJo2oYXmUrFRDG40sIYVhmDwHA", "name": "John Abbey", "email": "solutions@jycexports.com"},
     {"id": "user_n1y0yxmKit3rxkJlxhKZXFxEvG4y4G7C4cr4GPypUTx", "name": "Sebastian Jordan", "email": "sjordan@jycmachinery.com"},
     {"id": "user_BZhhrwAL2irTmKaPIntbraEWoINZrcYpKlGUUXsfwcV", "name": "Juan Arango", "email": "plastics@jycmachinery.com"},
+    {"id": "user_piUkoIPqMs7i1Lm3vdc2c2pE3lPjU3cCRvrmvxMonGy", "name": "Julian Prado", "email": "jp@jycmedical.com"},
+    {"id": "user_ESOupvkhojB5X4SkkJ20Nv05U2Klc0ImoRgS4Hwbwms", "name": "Juan Cordoba", "email": "jcordoba@jycexports.com"},
 ]
+
+# Equipo visible para Hernán (sus comerciales habituales sin Sebastian Jordan)
+HERNAN_TEAM_IDS = {
+    "user_TcBTZtqa1UlOlFQyDlhLJzEywClWo3CTQwXt2OREF2e",  # Hernan Bonilla
+    "user_QrLrTvgnGNQRS7AMKX2EuCFrZKvqgKmIUloYX1TkRQd",  # Mariana Polanco
+    "user_fFN8XRtibi7NPtCPiZSM6Z5cHmw87PYKDJ8Xg6tYv4D",  # Roy Jones
+    "user_7cXDrv9AKnoVTSOnXBJo2oYXmUrFRDG40sIYVhmDwHA",  # John Abbey
+    "user_BZhhrwAL2irTmKaPIntbraEWoINZrcYpKlGUUXsfwcV",  # Juan Arango
+}
 
 COMMERCIAL_MAP = {u["id"]: u for u in COMMERCIAL_TEAM}
 
@@ -98,6 +109,24 @@ COMMERCIAL_SCHEDULES = {
     },
     "user_BZhhrwAL2irTmKaPIntbraEWoINZrcYpKlGUUXsfwcV": {  # Juan Arango
         "name": "Juan Arango",
+        "default": [
+            (dt_time(8, 0), dt_time(11, 50)),
+            (dt_time(13, 0), dt_time(14, 35)),
+            (dt_time(14, 45), dt_time(17, 0))
+        ],
+        "schedule_label": "8:00 AM - 5:00 PM (Alm: 11:50-1:00 | Pausa: 2:35-2:45)"
+    },
+    "user_piUkoIPqMs7i1Lm3vdc2c2pE3lPjU3cCRvrmvxMonGy": {  # Julian Prado
+        "name": "Julian Prado",
+        "default": [
+            (dt_time(8, 0), dt_time(11, 50)),
+            (dt_time(13, 0), dt_time(14, 35)),
+            (dt_time(14, 45), dt_time(17, 0))
+        ],
+        "schedule_label": "8:00 AM - 5:00 PM (Alm: 11:50-1:00 | Pausa: 2:35-2:45)"
+    },
+    "user_ESOupvkhojB5X4SkkJ20Nv05U2Klc0ImoRgS4Hwbwms": {  # Juan Cordoba
+        "name": "Juan Cordoba",
         "default": [
             (dt_time(8, 0), dt_time(11, 50)),
             (dt_time(13, 0), dt_time(14, 35)),
@@ -242,7 +271,86 @@ def _resolve_lead_names(lead_ids, auth):
     return names_map
 
 
-def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=False):
+def _filter_dashboard_for_team(result, allowed_user_ids):
+    """Devuelve una copia filtrada del dashboard para vistas con visibilidad restringida (ej. Hernán)."""
+    if not result:
+        return result
+
+    commercials = [c for c in result.get("commercials", []) if c.get("user_id") in allowed_user_ids]
+    inactivity = [g for g in result.get("inactivity_records", []) if g.get("user_id") in allowed_user_ids]
+    discipline = [d for d in result.get("discipline_records", []) if d.get("user_id") in allowed_user_ids]
+    tagged = [t for t in result.get("tagged_records", []) if t.get("user_id") in allowed_user_ids]
+    ai_calls = [a for a in result.get("ai_call_audits", []) if a.get("user_id") in allowed_user_ids]
+    ai_tags = [a for a in result.get("ai_tag_audits", []) if a.get("user_id") in allowed_user_ids]
+    opps = [o for o in result.get("opportunities_list", []) if o.get("user_id") in allowed_user_ids]
+
+    tot_out = sum(c.get("calls_outbound", 0) for c in commercials)
+    tot_in = sum(c.get("calls_inbound", 0) for c in commercials)
+    tot_calls = sum(c.get("calls_total", 0) for c in commercials)
+    tot_dur_sec = sum(c.get("gross_dial_time", {}).get("seconds", 0) for c in commercials)
+    tot_live_kps = sum(c.get("live_kp", 0) for c in commercials)
+    tot_ekp = sum(c.get("ekp", 0) for c in commercials)
+    tot_tkp = sum(c.get("tkp", 0) for c in commercials)
+    tot_all_kps = sum(c.get("total_kps", 0) for c in commercials)
+
+    base_summary = dict(result.get("summary", {}))
+    base_summary.update({
+        "total_agents": len(commercials),
+        "total_out_calls": tot_out,
+        "total_in_calls": tot_in,
+        "total_calls": tot_calls,
+        "gross_dial_time": format_duration(tot_dur_sec),
+        "total_live_kps": tot_live_kps,
+        "total_ekp": tot_ekp,
+        "total_tkp": tot_tkp,
+        "total_all_kps": tot_all_kps,
+        "total_emails": sum(c.get("emails_sent", 0) for c in commercials),
+        "total_opps_sales": sum(c.get("opps_sales", 0) for c in commercials),
+        "total_opps_purchase": sum(c.get("opps_purchase", 0) for c in commercials),
+        "total_opps": sum(c.get("opps_total", 0) for c in commercials),
+        "total_tasks_set": sum(c.get("tasks_set", 0) for c in commercials),
+        "total_tasks_done": sum(c.get("tasks_done", 0) for c in commercials),
+        "team_effectiveness": round(100.0 * tot_live_kps / tot_calls, 2) if tot_calls else 0.0,
+        "total_inactivity_alerts": len(inactivity),
+        "total_critical_alerts": len([g for g in inactivity if g.get("severity") == "Critical"]),
+        "total_warning_alerts": len([g for g in inactivity if g.get("severity") == "Warning"]),
+        "total_minor_alerts": len([g for g in inactivity if g.get("severity") == "Minor"]),
+        "total_live_kp_verified": sum(1 for a in ai_calls if a.get("verdict") == "VERIFICADO"),
+        "total_ekp_verified": sum(1 for a in ai_tags if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
+        "total_tkp_verified": sum(1 for a in ai_tags if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
+    })
+
+    ai_summary = {
+        "calls_total": len(ai_calls),
+        "calls_verified": sum(1 for a in ai_calls if a.get("verdict") == "VERIFICADO"),
+        "calls_suspect": sum(1 for a in ai_calls if a.get("verdict") == "SOSPECHOSO"),
+        "calls_invalid": sum(1 for a in ai_calls if a.get("verdict") == "INVALIDO"),
+        "tags_total": len(ai_tags),
+        "tags_verified": sum(1 for a in ai_tags if a.get("verdict") == "VERIFICADO"),
+        "tags_suspect": sum(1 for a in ai_tags if a.get("verdict") == "SOSPECHOSO"),
+        "tags_invalid": sum(1 for a in ai_tags if a.get("verdict") == "INVALIDO"),
+        "ekp_total": sum(1 for a in ai_tags if a.get("type") == "EKP"),
+        "ekp_verified": sum(1 for a in ai_tags if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
+        "tkp_total": sum(1 for a in ai_tags if a.get("type") == "TKP"),
+        "tkp_verified": sum(1 for a in ai_tags if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
+        "gemini_enabled": any(str(a.get("model_used", "")).startswith("Gemini") for a in (ai_calls + ai_tags)),
+    }
+
+    return {
+        **result,
+        "commercials": commercials,
+        "summary": base_summary,
+        "tagged_records": tagged,
+        "opportunities_list": opps,
+        "inactivity_records": inactivity,
+        "discipline_records": discipline,
+        "ai_call_audits": ai_calls,
+        "ai_tag_audits": ai_tags,
+        "ai_summary": ai_summary,
+    }
+
+
+def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=False, include_all_commercials=True):
     """
     Obtiene todas las métricas para el panel comercial de Hernán:
     - Lista ordenada y exclusiva de los comerciales seleccionados.
@@ -272,7 +380,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     if not force_refresh and cache_key in _DASHBOARD_CACHE:
         entry = _DASHBOARD_CACHE[cache_key]
         if now_ts < entry["expires_at"]:
-            return entry["data"]
+            cached_res = entry["data"]
+            return cached_res if include_all_commercials else _filter_dashboard_for_team(cached_res, HERNAN_TEAM_IDS)
 
     start_iso = f"{start_date}T00:00:00-05:00"
     end_iso = f"{end_date}T23:59:59-05:00"
@@ -1126,4 +1235,4 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "expires_at": time.time() + 120  # 2 minutos de cache
     }
 
-    return result
+    return result if include_all_commercials else _filter_dashboard_for_team(result, HERNAN_TEAM_IDS)

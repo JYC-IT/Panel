@@ -2,9 +2,14 @@
 import csv
 import io
 from datetime import date, timedelta
-from flask import render_template, request, Response, redirect, url_for, flash
+from flask import render_template, request, Response, redirect, url_for, flash, g
 import auth
 from services import commercial_dashboard
+
+
+def _include_all_commercials():
+    """Admin ve todos los comerciales; lectores (ej. Hernán) ven solo su equipo asignado."""
+    return bool(getattr(g, "user", None) and g.user.get("role") == "admin")
 
 
 def get_date_presets():
@@ -66,7 +71,8 @@ def register_commercial_routes(app):
         data = commercial_dashboard.get_commercial_dashboard_data(
             start_date=start_date,
             end_date=end_date,
-            force_refresh=force_refresh
+            force_refresh=force_refresh,
+            include_all_commercials=_include_all_commercials(),
         )
 
         presets = get_date_presets()
@@ -87,7 +93,8 @@ def register_commercial_routes(app):
 
         data = commercial_dashboard.get_commercial_dashboard_data(
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            include_all_commercials=_include_all_commercials(),
         )
 
         if not data or not data.get("commercials"):
@@ -187,7 +194,8 @@ def register_commercial_routes(app):
 
         data = commercial_dashboard.get_commercial_dashboard_data(
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            include_all_commercials=_include_all_commercials(),
         )
 
         inactivity_records = data.get("inactivity_records", []) if data else []
@@ -249,7 +257,8 @@ def register_commercial_routes(app):
 
         data = commercial_dashboard.get_commercial_dashboard_data(
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            include_all_commercials=_include_all_commercials(),
         )
 
         records = data.get("discipline_records", []) if data else []
@@ -324,7 +333,8 @@ def register_commercial_routes(app):
 
         data = commercial_dashboard.get_commercial_dashboard_data(
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            include_all_commercials=_include_all_commercials(),
         )
 
         call_audits = data.get("ai_call_audits", []) if data else []
