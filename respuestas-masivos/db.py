@@ -1,9 +1,96 @@
-"""Base de datos SQLite: campañas y respuestas."""
+"""Base de datos dual: PostgreSQL (Neon/Render vía DATABASE_URL) o SQLite local."""
 import os
+import re
 import sqlite3
 from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data.db")
+
+
+class _HybridRow(dict):
+    """Fila compatible con sqlite3.Row: soporta acceso por nombre (row['col']) y por índice (row[0])."""
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return list(self.values())[key]
+        return super().__getitem__(key)
+
+
+def _translate_sql_for_pg(sql: str) -> str:
+    """Convierte SQL estilo SQLite (placeholders ?, AUTOINCREMENT, INSERT OR IGNORE) a PostgreSQL."""
+    s = re.sub(r"INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT", "SERIAL PRIMARY KEY", sql, flags=re.IGNORECASE)
+
+    has_insert_or_ignore = bool(re.search(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", s, flags=re.IGNORECASE))
+    if has_insert_or_ignore:
+        s = re.sub(r"\bINSERT\s+OR\s+IGNORE\s+INTO\b", "INSERT INTO", s, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in s.upper():
+            s = s.rstrip().rstrip(";") + " ON CONFLICT DO NOTHING"
+
+    # Reemplazar ? por %s únicamente fuera de literales entre comillas simples
+    out = []
+    in_single = False
+    i = 0
+    n = len(s)
+    while i < n:
+        ch = s[i]
+        if ch == "'":
+            out.append(ch)
+            if in_single and i + 1 < n and s[i + 1] == "'":
+                out.append("'")
+                i += 2
+                continue
+            in_single = not in_single
+        elif ch == "?" and not in_single:
+            out.append("%s")
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+class _PgDummyCursor:
+    rowcount = 0
+    def fetchone(self):
+        return None
+    def fetchall(self):
+        return []
+
+
+class _PgConnectionWrapper:
+    """Envuelve una conexión psycopg para exponer la misma API que sqlite3.Connection."""
+
+    def __init__(self, pg_conn):
+        self._conn = pg_conn
+        self.is_postgres = True
+
+    def execute(self, sql, params=None):
+        stripped = (sql or "").strip()
+        if stripped.upper().startswith("PRAGMA"):
+            return _PgDummyCursor()
+        pg_sql = _translate_sql_for_pg(stripped)
+        if params is not None and not isinstance(params, (tuple, dict)):
+            params = tuple(params)
+        return self._conn.execute(pg_sql, params)
+
+    def executemany(self, sql, seq_of_params):
+        pg_sql = _translate_sql_for_pg(sql)
+        with self._conn.cursor() as cur:
+            cur.executemany(pg_sql, seq_of_params)
+            return cur
+
+    def executescript(self, script):
+        clean_lines = []
+        for line in (script or "").splitlines():
+            clean_lines.append(re.sub(r"--.*$", "", line))
+        cleaned = "\n".join(clean_lines)
+        for stmt in cleaned.split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                self.execute(stmt)
+
+
+def _get_database_url() -> str:
+    return (os.getenv("DATABASE_URL") or "").strip()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS campaigns (
@@ -108,6 +195,23 @@ CREATE TABLE IF NOT EXISTS users (
 
 @contextmanager
 def get_conn():
+    db_url = _get_database_url()
+    if db_url:
+        import psycopg
+        from psycopg.rows import class_row
+
+        pg_conn = psycopg.connect(db_url, row_factory=class_row(_HybridRow))
+        wrapper = _PgConnectionWrapper(pg_conn)
+        try:
+            yield wrapper
+            pg_conn.commit()
+        except Exception:
+            pg_conn.rollback()
+            raise
+        finally:
+            pg_conn.close()
+        return
+
     conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -122,30 +226,32 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         conn.executescript(SCHEMA)
-        # Migración suave de columnas por si la tabla ya existía
-        for col, ctype in [
-            ("opens_count", "INTEGER DEFAULT 0"),
-            ("clicks_count", "INTEGER DEFAULT 0"),
-            ("reply_to_email", "TEXT"),
-            ("bounces_count", "INTEGER DEFAULT 0"),
-        ]:
+        is_pg = getattr(conn, "is_postgres", False)
+        if not is_pg:
+            # Migración suave de columnas por si la tabla ya existía en SQLite
+            for col, ctype in [
+                ("opens_count", "INTEGER DEFAULT 0"),
+                ("clicks_count", "INTEGER DEFAULT 0"),
+                ("reply_to_email", "TEXT"),
+                ("bounces_count", "INTEGER DEFAULT 0"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE campaigns ADD COLUMN {col} {ctype}")
+                except sqlite3.OperationalError:
+                    pass
+            for col, ctype in [
+                ("ringcentral_calls", "INTEGER DEFAULT 0"),
+                ("close_crm_calls", "INTEGER DEFAULT 0"),
+                ("clicks_count", "INTEGER DEFAULT 0"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE weekly_team_kpis ADD COLUMN {col} {ctype}")
+                except sqlite3.OperationalError:
+                    pass
             try:
-                conn.execute(f"ALTER TABLE campaigns ADD COLUMN {col} {ctype}")
+                conn.execute("ALTER TABLE replies ADD COLUMN intent TEXT DEFAULT 'general'")
             except sqlite3.OperationalError:
                 pass
-        for col, ctype in [
-            ("ringcentral_calls", "INTEGER DEFAULT 0"),
-            ("close_crm_calls", "INTEGER DEFAULT 0"),
-            ("clicks_count", "INTEGER DEFAULT 0"),
-        ]:
-            try:
-                conn.execute(f"ALTER TABLE weekly_team_kpis ADD COLUMN {col} {ctype}")
-            except sqlite3.OperationalError:
-                pass
-        try:
-            conn.execute("ALTER TABLE replies ADD COLUMN intent TEXT DEFAULT 'general'")
-        except sqlite3.OperationalError:
-            pass
 
         # Índices de alto rendimiento y tabla de cache de leads
         conn.execute("""
@@ -215,7 +321,7 @@ def deduplicate_replies(conn=None):
             SELECT message_key, COUNT(DISTINCT campaign_id) as c_count
             FROM replies
             GROUP BY message_key
-            HAVING c_count > 1
+            HAVING COUNT(DISTINCT campaign_id) > 1
         """).fetchall()
 
         if not dups:

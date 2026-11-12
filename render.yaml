@@ -10,6 +10,8 @@ services:
         value: 3.12.0
       - key: SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
       - key: CLOSE_CRM_API_KEY
         sync: false
       - key: INSTANTLY_API_KEY
