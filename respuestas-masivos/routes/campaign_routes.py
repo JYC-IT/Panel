@@ -237,7 +237,7 @@ def register_campaign_routes(app):
     @auth.admin_required
     def connect_constant_contact():
         from urllib.parse import quote
-        client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip() or Config.CONSTANT_CONTACT_CLIENT_ID
+        client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip() or Config.CONSTANT_CONTACT_CLIENT_ID or db.get_setting("cc_client_id", "").strip()
         if not client_id:
             flash("Configura CONSTANT_CONTACT_CLIENT_ID en las variables de entorno para conectar con 1 clic.", "error")
             return redirect(url_for("index"))

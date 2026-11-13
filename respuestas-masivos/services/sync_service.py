@@ -356,11 +356,22 @@ def sync_weekly_close_kpis():
         opens_sum = int(camp_row["opens_sum"] or 0)
         clicks_sum = int(camp_row["clicks_sum"] or 0)
 
-        # Si la consulta de campañas devuelve 0 pero ya existía un valor registrado (manual o previo), conservarlo
+        # Si la consulta de campañas devuelve 0 o parcial pero ya existía un valor registrado (manual o previo), conservarlo
         if cc_sent == 0 and existing and int(existing["outreach_emails_cc"] or 0) > 0:
             cc_sent = int(existing["outreach_emails_cc"])
+            opens_sum = max(opens_sum, int(existing["opens_count"] or 0))
+            clicks_sum = max(clicks_sum, int(existing["clicks_count"] or 0))
+        elif existing and int(existing["outreach_emails_cc"] or 0) > cc_sent:
+            # Si el valor existente es mayor (ej. ingresado manualmente o sincronizado completo previamente), no degradarlo
+            cc_sent = int(existing["outreach_emails_cc"])
+            opens_sum = max(opens_sum, int(existing["opens_count"] or 0))
+            clicks_sum = max(clicks_sum, int(existing["clicks_count"] or 0))
+
         if inst_sent == 0 and existing and int(existing["outreach_emails_instantly"] or 0) > 0:
             inst_sent = int(existing["outreach_emails_instantly"])
+        elif existing and int(existing["outreach_emails_instantly"] or 0) > inst_sent:
+            inst_sent = int(existing["outreach_emails_instantly"])
+
         if opens_sum == 0 and existing and int(existing["opens_count"] or 0) > 0:
             opens_sum = int(existing["opens_count"])
         if clicks_sum == 0 and existing and int(existing["clicks_count"] or 0) > 0:
