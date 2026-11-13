@@ -8,8 +8,16 @@ from services import commercial_dashboard
 
 
 def _include_all_commercials():
-    """Admin ve todos los comerciales; lectores (ej. Hernán) ven solo su equipo asignado."""
-    return bool(getattr(g, "user", None) and g.user.get("role") == "admin")
+    """Admin y Juan Córdoba ven todos los comerciales; lectores regulares (ej. Hernán) ven solo su equipo asignado."""
+    user = getattr(g, "user", None)
+    if not user:
+        return False
+    if user.get("role") == "admin":
+        return True
+    username = str(user.get("username", "")).lower()
+    if username in ("juancordoba", "jcordoba", "juan.cordoba", "juan_cordoba"):
+        return True
+    return False
 
 
 def get_date_presets():
