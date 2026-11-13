@@ -8,14 +8,17 @@ from services import commercial_dashboard
 
 
 def _include_all_commercials():
-    """Admin y Juan Córdoba ven todos los comerciales; lectores regulares (ej. Hernán) ven solo su equipo asignado."""
+    """Admin, Juan Córdoba y Julián Prado ven todos los comerciales; lectores regulares (ej. Hernán) ven solo su equipo asignado."""
     user = getattr(g, "user", None)
     if not user:
         return False
     if user.get("role") == "admin":
         return True
     username = str(user.get("username", "")).lower()
-    if username in ("juancordoba", "jcordoba", "juan.cordoba", "juan_cordoba"):
+    if username in (
+        "juancordoba", "jcordoba", "juan.cordoba", "juan_cordoba",
+        "julian", "julianprado", "jprado", "julian.prado", "julian_prado", "jp"
+    ):
         return True
     return False
 

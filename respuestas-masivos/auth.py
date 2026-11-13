@@ -89,8 +89,9 @@ def verify(username, password):
             """SELECT * FROM users 
                WHERE username = ? 
                   OR username = ?
-                  OR (? IN ('jcordoba', 'juancordoba') AND username IN ('jcordoba', 'juancordoba'))""",
-            (raw_user, user_handle, user_handle)
+                  OR (? IN ('jcordoba', 'juancordoba') AND username IN ('jcordoba', 'juancordoba'))
+                  OR (? IN ('julian', 'julianprado', 'jprado', 'jp') AND username IN ('julian', 'julianprado', 'jprado', 'jp'))""",
+            (raw_user, user_handle, user_handle, user_handle)
         ).fetchone()
         if not row or not row["active"] or not check_password_hash(row["password_hash"], password or ""):
             return None
@@ -127,6 +128,14 @@ def bootstrap_admin():
             print("  Usuario lector «juancordoba» inicializado.")
         else:
             set_password(jc_row["id"], "Jyc2026*Cordoba")
+
+        # 4. Julian Prado (Lector con acceso a comerciales)
+        jp_row = conn.execute("SELECT id FROM users WHERE username IN ('julianprado', 'julian', 'jprado', 'jp')").fetchone()
+        if not jp_row:
+            create_user("julianprado", "Julian Prado", "Jyc2026*Julian", "lector")
+            print("  Usuario lector «julianprado» inicializado.")
+        else:
+            set_password(jp_row["id"], "Jyc2026*Julian")
 
         # 3. Soporte opcional desde variables de entorno si se configuran
         env_user = os.getenv("ADMIN_USERNAME", "").strip()
