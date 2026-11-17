@@ -609,6 +609,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     # --- 6. Análisis de Inactividad entre Llamadas & Horas Primera/Última Llamada ---
     def fetch_call_inactivity():
         user_day_calls = defaultdict(list)
+        calls_by_user = defaultdict(list)
         all_gaps = []
         gaps_by_user = defaultdict(list)
         first_last_by_user = defaultdict(dict)
@@ -648,6 +649,27 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         dt_utc = datetime.fromisoformat(clean_dt)
                         dt_local = dt_utc.astimezone(local_tz)
                         day_str = dt_local.strftime("%Y-%m-%d")
+                        time_str = dt_local.strftime("%I:%M %p")
+                        dur_sec = int(c.get("duration") or 0)
+                        dur_human = f"{dur_sec // 60}m {dur_sec % 60:02d}s" if dur_sec else "0s"
+                        is_kp = c.get("outcome_id") == KP_OUTCOME_ID
+
+                        calls_by_user[uid].append({
+                            "id": c.get("id"),
+                            "date": day_str,
+                            "time": time_str,
+                            "datetime": dt_local.strftime("%Y-%m-%d %I:%M %p"),
+                            "direction": c.get("direction") or "outbound",
+                            "duration": dur_sec,
+                            "duration_human": dur_human,
+                            "phone": c.get("remote_phone_formatted") or c.get("remote_phone") or "-",
+                            "lead_id": c.get("lead_id"),
+                            "lead_name": c.get("lead_name") or "Sin Lead",
+                            "is_kp": is_kp,
+                            "outcome_label": "Live KP Talk" if is_kp else ("Contestada" if dur_sec > 0 else "Sin Respuesta"),
+                            "close_url": f"https://app.close.com/lead/{c.get('lead_id')}/" if c.get("lead_id") else "https://app.close.com/",
+                            "dt_sort": dt_local,
+                        })
                         user_day_calls[(uid, day_str)].append((dt_local, c))
                     except Exception:
                         pass
@@ -1037,7 +1059,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "kp_calls": kp_calls,
             "first_last": first_last_by_user,
             "daily_records": all_daily_records,
-            "latest_by_user": user_latest_checkpoints
+            "latest_by_user": user_latest_checkpoints,
+            "calls_by_user": calls_by_user,
         }
 
     # Ejecución paralela
@@ -1084,6 +1107,13 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             g["lead_before"] = lead_names_map[g["lead_id_before"]]
         if g.get("lead_id_after") in lead_names_map:
             g["lead_after"] = lead_names_map[g["lead_id_after"]]
+
+    for uid, ucalls in call_gaps.get("calls_by_user", {}).items():
+        for call in ucalls:
+            lid = call.get("lead_id")
+            if lid and lid in lead_names_map:
+                call["lead_name"] = lead_names_map[lid]
+        ucalls.sort(key=lambda x: x["dt_sort"], reverse=True)
 
     # Auditoría con IA en paralelo: Talked to KP + #EKP / #TKP
     ai_call_audits = []
@@ -1276,6 +1306,12 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "met_opps": met_opps,
             "status_goal": status_goal,
             "status_class": status_class,
+            # Detalle individual completo para el reporte interactivo del asesor
+            "calls_list": call_gaps.get("calls_by_user", {}).get(uid, []),
+            "kp_calls_list": [a for a in ai_call_audits if a.get("user_id") == uid],
+            "kp_tags_list": [t for t in ai_tag_audits if t.get("user_id") == uid],
+            "opportunities": [op for op in opps_data.get("list", []) if op.get("user_id") == uid],
+            "discipline_records": [d for d in call_gaps.get("daily_records", []) if d.get("user_id") == uid],
         })
 
     # Mantenemos el orden predeterminado estricto de COMMERCIAL_TEAM solicitado por Hernán

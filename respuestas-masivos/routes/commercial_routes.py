@@ -95,6 +95,35 @@ def register_commercial_routes(app):
             active_page="commercial_dashboard"
         )
 
+    @app.route("/comerciales/reporte/<user_id>")
+    @app.route("/commercial-dashboard/agent/<user_id>")
+    @auth.login_required
+    def commercial_agent_report_view(user_id):
+        today_iso = date.today().isoformat()
+        start_date = request.args.get("start_date") or today_iso
+        end_date = request.args.get("end_date") or today_iso
+
+        data = commercial_dashboard.get_commercial_dashboard_data(
+            start_date=start_date,
+            end_date=end_date,
+            include_all_commercials=_include_all_commercials(),
+        )
+
+        commercial = next((c for c in (data.get("commercials") or []) if c.get("id") == user_id), None)
+        if not commercial:
+            flash("Asesor comercial no encontrado o sin permisos para visualizarlo.", "err")
+            return redirect(url_for("commercial_dashboard_view", start_date=start_date, end_date=end_date))
+
+        presets = get_date_presets()
+
+        return render_template(
+            "commercial_agent_report.html",
+            data=data,
+            c=commercial,
+            presets=presets,
+            active_page="commercial_dashboard"
+        )
+
     @app.route("/commercial-dashboard/export.csv")
     @auth.login_required
     def export_commercial_csv():

@@ -279,12 +279,22 @@
           <!-- Asesor -->
           <td style="padding: 14px 16px; vertical-align: middle;">
             <div style="font-weight: 800; font-size: 14px; color: var(--text-main);">
-              {{ c.name }}
+              <a href="javascript:void(0)" onclick="openModal('agentModal_{{ c.id }}')"
+                 style="color: var(--brand); text-decoration: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;"
+                 title="Ver reporte interactivo de {{ c.name }}">
+                <span style="font-weight: 800; font-size: 14px; border-bottom: 1.5px dashed var(--brand);">{{ c.name }}</span>
+                <svg style="width: 13px; height: 13px; opacity: 0.8;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
             </div>
             <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">
               {{ c.email }}
             </div>
-            <div style="margin-top: 5px;">
+            <div style="margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <button type="button" onclick="openModal('agentModal_{{ c.id }}')" class="btn-executive secondary" style="padding: 2px 7px; font-size: 10.5px; font-weight: 700; cursor: pointer;" title="Ver llamadas, KPIs y oportunidades">
+                Ver Reporte 📊
+              </button>
               {% if c.status_class == 'ok' %}
                 <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 10.5px; font-weight: 800;">
                   Cumple Metas
@@ -1354,13 +1364,438 @@ function filterCommercialTable() {
   }
 }
 
-// Auto-actualización del panel de llamadas y KPIs cada 5 minutos (sin interrumpir si el usuario está escribiendo)
+function switchAgentModalTab(userId, tabName, btn) {
+  const container = document.getElementById('agentModal_' + userId);
+  if (!container) return;
+  container.querySelectorAll('.agent-modal-tab-content').forEach(function(pane) {
+    pane.style.display = 'none';
+  });
+  container.querySelectorAll('.agent-tab-btn').forEach(function(b) {
+    b.style.borderBottomColor = 'transparent';
+    b.style.color = 'var(--text-secondary)';
+  });
+  const target = document.getElementById('agentModalTab_' + userId + '_' + tabName);
+  if (target) target.style.display = 'block';
+  btn.style.borderBottomColor = 'var(--brand)';
+  btn.style.color = 'var(--brand)';
+}
+
+function filterAgentModalCalls(userId, query) {
+  const q = (query || '').toLowerCase();
+  const rows = document.querySelectorAll('#agentCallsTable_' + userId + ' tbody tr.agent-call-row');
+  let count = 0;
+  rows.forEach(function(r) {
+    const s = r.getAttribute('data-search') || '';
+    if (!q || s.includes(q)) {
+      r.style.display = '';
+      count++;
+    } else {
+      r.style.display = 'none';
+    }
+  });
+  const countEl = document.getElementById('agentCallsCount_' + userId);
+  if (countEl) countEl.innerText = count;
+}
+
+// Auto-actualización del panel de llamadas y KPIs cada 5 minutos (sin interrumpir si el usuario está escribiendo o con modal abierto)
 setInterval(function() {
   const active = document.activeElement;
   const isTyping = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA");
-  if (!isTyping) {
+  const anyModalOpen = Array.from(document.querySelectorAll('[id^="agentModal_"]')).some(function(el) {
+    return el.style.display && el.style.display !== 'none';
+  });
+  if (!isTyping && !anyModalOpen) {
     window.location.reload();
   }
 }, 300000);
 </script>
+
+<!-- MODALES DE REPORTE INDIVIDUAL POR ASESOR -->
+{% for c in data.commercials %}
+<div id="agentModal_{{ c.id }}" style="display:none; position:fixed; z-index:9999; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.75); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding: 16px;">
+  <div style="background:white; border-radius:16px; max-width:1100px; width:96%; max-height:92vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0, 0, 0, 0.35); overflow:hidden; border: 1px solid rgba(255,255,255,0.2);">
+    
+    <!-- Modal Header -->
+    <div style="padding: 16px 24px; background: #0f172a; color: white; display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-shrink: 0;">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 44px; height: 44px; border-radius: 12px; background: linear-gradient(135deg, #0284c7, #0369a1); display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 900; color: white;">
+          {{ c.name[:2].upper() }}
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <h2 style="margin: 0; font-size: 18px; font-weight: 800; color: white;">
+              {{ c.name }}
+            </h2>
+            {% if c.status_class == 'ok' %}
+              <span class="badge" style="background: #059669; color: white; font-size: 10.5px; font-weight: 800;">Cumple Metas</span>
+            {% elif c.status_class == 'warning' %}
+              <span class="badge" style="background: #d97706; color: white; font-size: 10.5px; font-weight: 800;">Parcial</span>
+            {% else %}
+              <span class="badge" style="background: #dc2626; color: white; font-size: 10.5px; font-weight: 800;">Bajo Meta</span>
+            {% endif %}
+          </div>
+          <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">
+            {{ c.email }} &bull; Horario: <strong>{{ c.schedule_label }}</strong> &bull; Período: <strong>{{ data.start_date }}</strong> al <strong>{{ data.end_date }}</strong> ({{ data.business_days }} días hábiles)
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="{{ url_for('commercial_agent_report_view', user_id=c.id, start_date=data.start_date, end_date=data.end_date) }}" target="_blank" class="btn-executive secondary" style="background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: white; padding: 6px 12px; font-size: 12px; text-decoration: none;">
+          <svg style="width: 13px; height: 13px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+          Página Completa / Imprimir
+        </a>
+        <button type="button" onclick="closeModal('agentModal_{{ c.id }}')" style="background: none; border: none; font-size: 24px; color: #94a3b8; cursor: pointer; line-height: 1; padding: 4px;" title="Cerrar modal">&times;</button>
+      </div>
+    </div>
+
+    <!-- KPI Summary Row -->
+    <div style="background: #f8fafc; padding: 12px 24px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; flex-shrink: 0;">
+      <div>
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Llamadas</div>
+        <div style="font-size: 17px; font-weight: 900; color: {% if c.met_calls %}#059669{% else %}#dc2626{% endif %};">
+          {{ c.calls_total }} <span style="font-size: 11px; font-weight: 600; color: #64748b;">/ {{ data.business_days * 120 }}</span>
+        </div>
+        <div style="font-size: 10.5px; color: #64748b;">{{ c.calls_out }} out &bull; {{ c.calls_in }} in &bull; {{ c.gross_dial_time.human }}</div>
+      </div>
+      <div>
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Key People (KPs)</div>
+        <div style="font-size: 17px; font-weight: 900; color: {% if c.met_kps %}#059669{% else %}#dc2626{% endif %};">
+          {{ c.total_kps }} <span style="font-size: 11px; font-weight: 600; color: #64748b;">/ {{ data.business_days * 15 }}</span>
+        </div>
+        <div style="font-size: 10.5px; color: #64748b;">{{ c.live_kp }} call &bull; {{ c.ekp }} EKP &bull; {{ c.tkp }} TKP</div>
+      </div>
+      <div>
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Oportunidades</div>
+        <div style="font-size: 17px; font-weight: 900; color: {% if c.met_opps %}#059669{% else %}#d97706{% endif %};">
+          {{ c.opps_total }} <span style="font-size: 11px; font-weight: 600; color: #64748b;">/ {{ data.business_days * 5 }}</span>
+        </div>
+        <div style="font-size: 10.5px; color: #64748b;">{{ c.opps_sales }} venta &bull; {{ c.opps_purchase }} compra</div>
+      </div>
+      <div>
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Inactividad &ge;10m</div>
+        <div style="font-size: 17px; font-weight: 900; color: {% if c.inactivity_count > 0 %}#dc2626{% else %}#059669{% endif %};">
+          {{ c.inactivity_count }} <span style="font-size: 11px; font-weight: 600; color: #64748b;">pausas</span>
+        </div>
+        <div style="font-size: 10.5px; color: #64748b;">{{ c.inactivity_total_min }} min perdidos</div>
+      </div>
+      <div>
+        <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase;">Tareas y Efectividad</div>
+        <div style="font-size: 17px; font-weight: 900; color: #0284c7;">
+          {{ c.effectiveness }}% <span style="font-size: 11px; font-weight: 600; color: #64748b;">KP/call</span>
+        </div>
+        <div style="font-size: 10.5px; color: #64748b;">{{ c.tasks_set }} set &bull; {{ c.tasks_done }} done</div>
+      </div>
+    </div>
+
+    <!-- Modal Tabs Nav -->
+    <div style="padding: 0 24px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; background: white; flex-shrink: 0; overflow-x: auto;">
+      <button type="button" class="agent-tab-btn active" onclick="switchAgentModalTab('{{ c.id }}', 'calls', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid var(--brand); color: var(--brand); cursor: pointer;">
+        📞 Llamadas ({{ c.calls_list|length }})
+      </button>
+      <button type="button" class="agent-tab-btn" onclick="switchAgentModalTab('{{ c.id }}', 'kpis', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer;">
+        🎯 KPIs Marcados ({{ c.total_kps }})
+      </button>
+      <button type="button" class="agent-tab-btn" onclick="switchAgentModalTab('{{ c.id }}', 'opps', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer;">
+        💼 Oportunidades ({{ c.opportunities|length }})
+      </button>
+      <button type="button" class="agent-tab-btn" onclick="switchAgentModalTab('{{ c.id }}', 'discipline', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer;">
+        ⏱️ Jornada & Pausas ({{ c.inactivity_gaps|length }})
+      </button>
+    </div>
+
+    <!-- Modal Body (Scrollable) -->
+    <div style="padding: 18px 24px; overflow-y: auto; flex-grow: 1;">
+      
+      <!-- SUBTAB 1: LLAMADAS -->
+      <div id="agentModalTab_{{ c.id }}_calls" class="agent-modal-tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 10px; flex-wrap: wrap;">
+          <input type="text" placeholder="Buscar por lead o teléfono..." onkeyup="filterAgentModalCalls('{{ c.id }}', this.value)" style="padding: 6px 12px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border); width: 250px;">
+          <div style="font-size: 11.5px; color: var(--text-muted);">
+            Mostrando <strong id="agentCallsCount_{{ c.id }}">{{ c.calls_list|length }}</strong> llamadas
+          </div>
+        </div>
+
+        {% if c.calls_list %}
+        <div style="overflow-x: auto; max-height: 48vh;">
+          <table id="agentCallsTable_{{ c.id }}" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 2px solid var(--border); position: sticky; top: 0; z-index: 10;">
+                <th style="padding: 8px 10px; text-align: left;">Fecha y Hora</th>
+                <th style="padding: 8px 10px; text-align: left;">Tipo</th>
+                <th style="padding: 8px 10px; text-align: left;">Lead / Empresa</th>
+                <th style="padding: 8px 10px; text-align: left;">Teléfono</th>
+                <th style="padding: 8px 10px; text-align: center;">Duración</th>
+                <th style="padding: 8px 10px; text-align: center;">Resultado</th>
+                <th style="padding: 8px 10px; text-align: center;">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for call in c.calls_list %}
+              <tr class="agent-call-row" data-search="{{ (call.lead_name ~ ' ' ~ call.phone)|lower }}" style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 7px 10px; font-weight: 600; white-space: nowrap;">{{ call.datetime }}</td>
+                <td style="padding: 7px 10px;">
+                  {% if call.direction == 'inbound' %}
+                    <span class="badge" style="background: #e0f2fe; color: #0369a1; font-size: 10px;">Entrante</span>
+                  {% else %}
+                    <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 10px;">Saliente</span>
+                  {% endif %}
+                </td>
+                <td style="padding: 7px 10px; font-weight: 700; color: var(--text-main);">
+                  {% if call.lead_id %}
+                    <a href="{{ call.close_url }}" target="_blank" style="color: var(--brand); text-decoration: none;">
+                      {{ call.lead_name }} ↗
+                    </a>
+                  {% else %}
+                    {{ call.lead_name }}
+                  {% endif %}
+                </td>
+                <td style="padding: 7px 10px; font-family: monospace; color: var(--text-secondary);">{{ call.phone }}</td>
+                <td style="padding: 7px 10px; text-align: center; font-weight: 600;">{{ call.duration_human }}</td>
+                <td style="padding: 7px 10px; text-align: center;">
+                  {% if call.is_kp %}
+                    <span class="badge" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; font-weight: 800;">Live KP Talk</span>
+                  {% elif call.duration > 0 %}
+                    <span class="badge" style="background: #ecfdf5; color: #047857;">Contestada</span>
+                  {% else %}
+                    <span class="badge" style="background: #f8fafc; color: #94a3b8;">Sin Resp.</span>
+                  {% endif %}
+                </td>
+                <td style="padding: 7px 10px; text-align: center;">
+                  {% if call.lead_id %}
+                    <a href="{{ call.close_url }}" target="_blank" class="btn-executive secondary" style="padding: 2px 6px; font-size: 10.5px; text-decoration: none;">Close ↗</a>
+                  {% else %}-{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div style="padding: 30px; text-align: center; color: var(--text-muted);">Sin llamadas registradas en este período.</div>
+        {% endif %}
+      </div>
+
+      <!-- SUBTAB 2: KPIS MARCADOS -->
+      <div id="agentModalTab_{{ c.id }}_kpis" class="agent-modal-tab-content" style="display: none;">
+        <!-- Live KP Calls -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #0284c7; display: flex; align-items: gap: 6px;">
+            📞 Llamadas Talked to KP ({{ c.kp_calls_list|length }})
+          </h4>
+          {% if c.kp_calls_list %}
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            {% for call in c.kp_calls_list %}
+            <div style="border: 1px solid {% if call.verdict == 'VERIFICADO' %}#a7f3d0{% elif call.verdict == 'INVALIDO' %}#fecaca{% else %}#fde68a{% endif %}; border-radius: 8px; padding: 10px 14px; background: {% if call.verdict == 'VERIFICADO' %}#f0fdf4{% elif call.verdict == 'INVALIDO' %}#fef2f2{% else %}#fffbeb{% endif %};">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                  <span style="font-weight: 800; font-size: 13px; color: var(--text-main);">{{ call.lead_name }}</span>
+                  <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">{{ call.date }} &bull; {{ call.duration // 60 }}m {{ call.duration % 60 }}s</span>
+                  <div style="font-size: 12px; color: #1e293b; margin-top: 4px;">
+                    <strong>Dictamen IA:</strong> {{ call.reason or 'Sin observaciones.' }}
+                  </div>
+                  {% if call.summary %}
+                  <div style="font-size: 11.5px; color: #475569; margin-top: 2px; font-style: italic;">
+                    "{{ call.summary }}"
+                  </div>
+                  {% endif %}
+                </div>
+                <div style="text-align: right;">
+                  <span class="badge" style="background: {% if call.verdict == 'VERIFICADO' %}#059669{% elif call.verdict == 'INVALIDO' %}#dc2626{% else %}#d97706{% endif %}; color: white; font-weight: 800; font-size: 10px;">
+                    {{ call.verdict }}
+                  </span>
+                  {% if call.lead_id %}
+                  <div style="margin-top: 4px;">
+                    <a href="https://app.close.com/lead/{{ call.lead_id }}/" target="_blank" style="font-size: 11px; color: var(--brand); text-decoration: none;">Ver Lead ↗</a>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+            <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px;">Sin llamadas Talked to KP.</div>
+          {% endif %}
+        </div>
+
+        <!-- Tags #EKP y #TKP -->
+        <div>
+          <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #7c3aed; display: flex; align-items: center; gap: 6px;">
+            🏷️ Notas con #EKP y #TKP ({{ c.kp_tags_list|length }})
+          </h4>
+          {% if c.kp_tags_list %}
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            {% for tag in c.kp_tags_list %}
+            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; background: white;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                  <span class="badge" style="background: {% if tag.type == 'EKP' %}#f3e8ff; color: #7e22ce{% else %}#fef3c7; color: #b45309{% endif %}; font-weight: 800; font-size: 10px;">
+                    #{{ tag.type }}
+                  </span>
+                  <span style="font-weight: 800; font-size: 13px; color: var(--text-main); margin-left: 6px;">{{ tag.lead_name or 'Lead' }}</span>
+                  <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">{{ tag.date }}</span>
+                  <div style="font-size: 12px; color: #0f172a; margin-top: 4px; padding: 5px 8px; background: #f8fafc; border-radius: 6px; border-left: 3px solid #7c3aed;">
+                    {{ tag.text }}
+                  </div>
+                  {% if tag.reason %}
+                  <div style="font-size: 11.5px; color: #475569; margin-top: 4px;">
+                    <strong>IA:</strong> {{ tag.reason }}
+                  </div>
+                  {% endif %}
+                </div>
+                <div style="text-align: right;">
+                  <span class="badge" style="background: {% if tag.verdict == 'VERIFICADO' %}#ecfdf5; color: #047857{% elif tag.verdict == 'INVALIDO' %}#fee2e2; color: #b91c1c{% else %}#fef3c7; color: #b45309{% endif %}; font-weight: 800; font-size: 10px;">
+                    {{ tag.verdict }}
+                  </span>
+                  {% if tag.lead_id %}
+                  <div style="margin-top: 4px;">
+                    <a href="https://app.close.com/lead/{{ tag.lead_id }}/" target="_blank" style="font-size: 11px; color: var(--brand); text-decoration: none;">Ver Lead ↗</a>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+            <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px;">Sin notas con #EKP o #TKP.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- SUBTAB 3: OPORTUNIDADES -->
+      <div id="agentModalTab_{{ c.id }}_opps" class="agent-modal-tab-content" style="display: none;">
+        {% if c.opportunities %}
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="background: #f8fafc; border-bottom: 2px solid var(--border); text-align: left;">
+                <th style="padding: 8px 10px;">Fecha</th>
+                <th style="padding: 8px 10px;">Lead / Empresa</th>
+                <th style="padding: 8px 10px;">Pipeline</th>
+                <th style="padding: 8px 10px;">Etapa / Status</th>
+                <th style="padding: 8px 10px; text-align: right;">Valor ($)</th>
+                <th style="padding: 8px 10px; text-align: center;">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for opp in c.opportunities %}
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px 10px; font-weight: 600;">{{ (opp.date_created or '')[:10] }}</td>
+                <td style="padding: 8px 10px; font-weight: 700;">{{ opp.lead_name }}</td>
+                <td style="padding: 8px 10px;">
+                  <span class="badge" style="background: {% if opp.pipeline_type == 'Sales' %}#ecfdf5; color: #047857{% else %}#eff6ff; color: #1d4ed8{% endif %}; font-weight: 700;">
+                    {{ opp.pipeline_type }}
+                  </span>
+                </td>
+                <td style="padding: 8px 10px;">{{ opp.status_label }}</td>
+                <td style="padding: 8px 10px; text-align: right; font-weight: 800; color: #059669;">
+                  ${{ "{:,.2f}".format(opp.value or 0) }}
+                </td>
+                <td style="padding: 8px 10px; text-align: center;">
+                  {% if opp.lead_id %}
+                    <a href="https://app.close.com/lead/{{ opp.lead_id }}/" target="_blank" class="btn-executive secondary" style="padding: 2px 6px; font-size: 10.5px; text-decoration: none;">Lead ↗</a>
+                  {% else %}-{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <div style="padding: 30px; text-align: center; color: var(--text-muted);">Sin oportunidades creadas en este período.</div>
+        {% endif %}
+      </div>
+
+      <!-- SUBTAB 4: JORNADA Y PAUSAS -->
+      <div id="agentModalTab_{{ c.id }}_discipline" class="agent-modal-tab-content" style="display: none;">
+        <!-- Checkpoints -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #1e293b;">
+            ⏰ Checkpoints de Jornada (Entrada, Almuerzo y Cierre)
+          </h4>
+          {% if c.discipline_records %}
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: center;">
+              <thead>
+                <tr style="background: #f8fafc; border-bottom: 2px solid var(--border);">
+                  <th style="padding: 6px 8px; text-align: left;">Fecha</th>
+                  <th style="padding: 6px 8px; color: #059669;">1ra AM (Entrada)</th>
+                  <th style="padding: 6px 8px; color: #d97706;">Última AM (Alm 11:50)</th>
+                  <th style="padding: 6px 8px; color: #2563eb;">1ra PM (Reg 1:00)</th>
+                  <th style="padding: 6px 8px; color: #7c3aed;">Última PM (Salida)</th>
+                  <th style="padding: 6px 8px;">Llamadas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in c.discipline_records %}
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 6px 8px; text-align: left; font-weight: 700;">{{ d.date }}</td>
+                  <td style="padding: 6px 8px; font-weight: 700; color: {{ d.first_am.color }};">{{ d.first_am.time }}</td>
+                  <td style="padding: 6px 8px; font-weight: 700; color: {{ d.last_am.color }};">{{ d.last_am.time }}</td>
+                  <td style="padding: 6px 8px; font-weight: 700; color: {{ d.first_pm.color }};">{{ d.first_pm.time }}</td>
+                  <td style="padding: 6px 8px; font-weight: 700; color: {{ d.last_pm.color }};">{{ d.last_pm.time }}</td>
+                  <td style="padding: 6px 8px; font-weight: 800;">{{ d.total_calls }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px;">Sin registros diarios.</div>
+          {% endif %}
+        </div>
+
+        <!-- Inactivity Gaps -->
+        <div>
+          <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #dc2626;">
+            ⚠️ Pausas Inactivas Detectadas &ge; 10 min ({{ c.inactivity_gaps|length }})
+          </h4>
+          {% if c.inactivity_gaps %}
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+              <thead>
+                <tr style="background: #f8fafc; border-bottom: 2px solid var(--border); text-align: left;">
+                  <th style="padding: 6px 8px;">Fecha</th>
+                  <th style="padding: 6px 8px;">Horario</th>
+                  <th style="padding: 6px 8px; text-align: center;">Duración</th>
+                  <th style="padding: 6px 8px;">Tipo</th>
+                  <th style="padding: 6px 8px;">Antes</th>
+                  <th style="padding: 6px 8px;">Después</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for gap in c.inactivity_gaps %}
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 6px 8px; font-weight: 600;">{{ gap.date }}</td>
+                  <td style="padding: 6px 8px; font-weight: 700;">{{ gap.from_time }} &rarr; {{ gap.to_time }}</td>
+                  <td style="padding: 6px 8px; text-align: center;">
+                    <span class="badge" style="background: {% if gap.severity == 'Critical' %}#fee2e2; color: #991b1b{% elif gap.severity == 'Warning' %}#fef3c7; color: #92400e{% else %}#f1f5f9; color: #475569{% endif %}; font-weight: 800;">
+                      {{ gap.gap_human }}
+                    </span>
+                  </td>
+                  <td style="padding: 6px 8px; font-weight: 600;">{{ gap.pause_type }}</td>
+                  <td style="padding: 6px 8px; font-size: 10.5px; color: var(--text-secondary);">{{ gap.lead_before }}</td>
+                  <td style="padding: 6px 8px; font-size: 10.5px; color: var(--text-secondary);">{{ gap.lead_after }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <div style="padding: 16px; text-align: center; color: #059669; font-weight: 700; font-size: 12px;">
+              ✅ Cero pausas de inactividad &ge; 10 min en este período.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+{% endfor %}
 {% endblock %}
