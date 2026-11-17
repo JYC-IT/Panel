@@ -603,7 +603,7 @@ def save_agent_kpis(week_number, per_user_list):
 def get_agent_kpis(week_number=None):
     """Retorna las métricas individuales por asesor para una semana (o la última), excluyendo personal inactivo o desvinculado."""
     with get_conn() as conn:
-        exclude_sql = "AND name NOT LIKE '%Roy%' AND name NOT LIKE '%Carlos%' AND user_id != 'user_Aa5pIAD0HQvnxk1hAMdvdBz3UAjW1NaVrKFMfJpmpaK'"
+        exclude_sql = "AND name NOT LIKE '%Carlos%' AND user_id != 'user_Aa5pIAD0HQvnxk1hAMdvdBz3UAjW1NaVrKFMfJpmpaK' AND TRIM(name) != ''"
         if week_number:
             rows = conn.execute(
                 f"SELECT * FROM weekly_agent_kpis WHERE week_number = ? {exclude_sql} ORDER BY calls DESC",
