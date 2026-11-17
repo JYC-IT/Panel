@@ -25,9 +25,10 @@ PIPELINE_SALES_ID = "pipe_2g0VCRFwavbPI4whagZads"      # Sell
 PIPELINE_PURCHASE_ID = "pipe_3BxoKZTZl7XgFpE3YpVQJr"   # Purchase
 
 # Metas Diarias Oficiales fijadas por Hernán
-DAILY_GOAL_CALLS = 60          # Mínimo 60 llamadas diarias
-DAILY_GOAL_TOTAL_KPS = 10      # Mínimo 10 KPs diarios
-DAILY_GOAL_CALL_KPS = 5        # La mitad de esos KPs deben ser llamadas (mínimo 5)
+DAILY_GOAL_CALLS = 120         # Mínimo 120 llamadas diarias
+DAILY_GOAL_TOTAL_KPS = 15      # Mínimo 15 KPs diarios
+DAILY_GOAL_CALL_KPS = 8        # La mitad de esos KPs deben ser llamadas (mínimo 50% -> 8)
+DAILY_GOAL_OPPS = 5            # Mínimo 5 Oportunidades diarias
 
 # Todos los asesores comerciales activos visibles para Administrador
 COMMERCIAL_TEAM = [
@@ -363,7 +364,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     - Emails Enviados
     - Oportunidades: Total, Sales Pipeline, Purchase Pipeline
     - Tareas: Set / Done
-    - Metas Diarias: 60 llamadas, 10 KPs (mínimo 5 por llamada) y % de cumplimiento.
+    - Metas Diarias: 120 llamadas, 15 KPs (mínimo 50% por llamada), 5 Oportunidades y % de cumplimiento.
     """
     auth = _get_auth()
     if not auth:
@@ -390,6 +391,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     period_target_calls = business_days * DAILY_GOAL_CALLS
     period_target_kps = business_days * DAILY_GOAL_TOTAL_KPS
     period_target_call_kps = business_days * DAILY_GOAL_CALL_KPS
+    period_target_opps = business_days * DAILY_GOAL_OPPS
 
     user_ids = [u["id"] for u in COMMERCIAL_TEAM]
 
@@ -1170,21 +1172,25 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         avg_calls_day = round(c_total / business_days, 1)
         avg_kps_day = round(all_kps / business_days, 1)
         avg_call_kps_day = round(live_kp / business_days, 1)
+        avg_opps_day = round(op_total / business_days, 1)
 
         # Cumplimiento contra metas del periodo
         calls_pct = round(100.0 * c_total / period_target_calls, 1) if period_target_calls else 0.0
         kps_pct = round(100.0 * all_kps / period_target_kps, 1) if period_target_kps else 0.0
         call_kps_pct = round(100.0 * live_kp / period_target_call_kps, 1) if period_target_call_kps else 0.0
+        opps_pct = round(100.0 * op_total / period_target_opps, 1) if period_target_opps else 0.0
 
         met_calls = c_total >= period_target_calls
         met_kps = all_kps >= period_target_kps
         met_call_kps = live_kp >= period_target_call_kps
+        met_opps = op_total >= period_target_opps
 
-        # Estado global
-        if met_calls and met_kps and met_call_kps:
+        # Estado global considerando llamadas, KPs y oportunidades
+        met_count = sum([met_calls, met_kps, met_opps])
+        if met_calls and met_kps and met_opps and met_call_kps:
             status_goal = "Cumple Todo"
             status_class = "ok"
-        elif met_calls or met_kps:
+        elif met_count >= 1:
             status_goal = "Parcial"
             status_class = "warning"
         else:
@@ -1253,13 +1259,16 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "avg_calls_day": avg_calls_day,
             "avg_kps_day": avg_kps_day,
             "avg_call_kps_day": avg_call_kps_day,
+            "avg_opps_day": avg_opps_day,
             # Porcentajes de meta
             "calls_pct": calls_pct,
             "kps_pct": kps_pct,
             "call_kps_pct": call_kps_pct,
+            "opps_pct": opps_pct,
             "met_calls": met_calls,
             "met_kps": met_kps,
             "met_call_kps": met_call_kps,
+            "met_opps": met_opps,
             "status_goal": status_goal,
             "status_class": status_class,
         })
@@ -1272,9 +1281,11 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "daily_goal_calls": DAILY_GOAL_CALLS,
         "daily_goal_total_kps": DAILY_GOAL_TOTAL_KPS,
         "daily_goal_call_kps": DAILY_GOAL_CALL_KPS,
+        "daily_goal_opps": DAILY_GOAL_OPPS,
         "period_target_calls_per_agent": period_target_calls,
         "period_target_kps_per_agent": period_target_kps,
         "period_target_call_kps_per_agent": period_target_call_kps,
+        "period_target_opps_per_agent": period_target_opps,
         # Totales equipo
         "total_out_calls": tot_out_calls,
         "total_in_calls": tot_in_calls,
