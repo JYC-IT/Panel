@@ -293,7 +293,7 @@
             </div>
             <div style="margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <button type="button" onclick="openModal('agentModal_{{ c.id }}')" class="btn-executive secondary" style="padding: 2px 7px; font-size: 10.5px; font-weight: 700; cursor: pointer;" title="Ver llamadas, KPIs y oportunidades">
-                Ver Reporte 📊
+                Ver Reporte 
               </button>
               {% if c.status_class == 'ok' %}
                 <span class="badge" style="background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; font-size: 10.5px; font-weight: 800;">
@@ -509,36 +509,36 @@
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span style="color: var(--text-secondary);">120 llam/d:</span>
                 {% if c.met_calls %}
-                  <span style="color: #059669; font-weight: 800;">✓ {{ c.avg_calls_day }}/d</span>
+                  <span style="color: #059669; font-weight: 800;"> {{ c.avg_calls_day }}/d</span>
                 {% else %}
-                  <span style="color: #dc2626; font-weight: 700;">✗ {{ c.avg_calls_day }}/d</span>
+                  <span style="color: #dc2626; font-weight: 700;"> {{ c.avg_calls_day }}/d</span>
                 {% endif %}
               </div>
               <!-- Meta 2: Total KPs -->
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span style="color: var(--text-secondary);">15 KP/d:</span>
                 {% if c.met_kps %}
-                  <span style="color: #059669; font-weight: 800;">✓ {{ c.avg_kps_day }}/d</span>
+                  <span style="color: #059669; font-weight: 800;"> {{ c.avg_kps_day }}/d</span>
                 {% else %}
-                  <span style="color: #dc2626; font-weight: 700;">✗ {{ c.avg_kps_day }}/d</span>
+                  <span style="color: #dc2626; font-weight: 700;"> {{ c.avg_kps_day }}/d</span>
                 {% endif %}
               </div>
               <!-- Meta 3: Oportunidades -->
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span style="color: var(--text-secondary);">5 Opps/d:</span>
                 {% if c.met_opps %}
-                  <span style="color: #059669; font-weight: 800;">✓ {{ c.avg_opps_day }}/d</span>
+                  <span style="color: #059669; font-weight: 800;"> {{ c.avg_opps_day }}/d</span>
                 {% else %}
-                  <span style="color: #dc2626; font-weight: 700;">✗ {{ c.avg_opps_day }}/d</span>
+                  <span style="color: #dc2626; font-weight: 700;"> {{ c.avg_opps_day }}/d</span>
                 {% endif %}
               </div>
               <!-- Meta 4: 50% llamadas -->
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                 <span style="color: var(--text-secondary);">50% llamadas:</span>
                 {% if c.met_call_kps %}
-                  <span style="color: #059669; font-weight: 800;">✓ ({{ "{:.0f}%".format(100.0 * c.live_kp / c.total_kps) if c.total_kps else 0 }})</span>
+                  <span style="color: #059669; font-weight: 800;"> ({{ "{:.0f}%".format(100.0 * c.live_kp / c.total_kps) if c.total_kps else 0 }})</span>
                 {% else %}
-                  <span style="color: #dc2626; font-weight: 700;">✗ ({{ "{:.0f}%".format(100.0 * c.live_kp / c.total_kps) if c.total_kps else 0 }})</span>
+                  <span style="color: #dc2626; font-weight: 700;"> ({{ "{:.0f}%".format(100.0 * c.live_kp / c.total_kps) if c.total_kps else 0 }})</span>
                 {% endif %}
               </div>
             </div>
@@ -857,7 +857,7 @@
           <td style="padding: 11px 14px; text-align: center; font-weight: 700; color: var(--text-main); font-size: 12px;">
             <div>
               <span style="color: #64748b;">{{ gap.from_time }}</span> 
-              <span style="color: #cbd5e1; margin: 0 4px;">➔</span> 
+              <span style="color: #cbd5e1; margin: 0 4px;"></span> 
               <span style="color: var(--text-main);">{{ gap.to_time }}</span>
             </div>
             {% if gap.discounted_minutes and gap.discounted_minutes > 0 %}
@@ -1509,16 +1509,16 @@ setInterval(function() {
     <!-- Modal Tabs Nav -->
     <div style="padding: 0 24px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; background: white; flex-shrink: 0; overflow-x: auto;">
       <button type="button" class="agent-tab-btn active" onclick="switchAgentModalTab('{{ c.id }}', 'calls', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid var(--brand); color: var(--brand); cursor: pointer;">
-        📞 Llamadas ({{ c.calls_list|length }})
+         Llamadas ({{ c.calls_list|length }})
       </button>
       <button type="button" class="agent-tab-btn" onclick="switchAgentModalTab('{{ c.id }}', 'kpis', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer;">
-        🎯 KPIs Marcados ({{ c.total_kps }})
+         KPIs Marcados ({{ c.total_kps }})
       </button>
       <button type="button" class="agent-tab-btn" onclick="switchAgentModalTab('{{ c.id }}', 'opps', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer;">
-        💼 Oportunidades ({{ c.opportunities|length }})
+         Oportunidades ({{ c.opportunities|length }})
       </button>
       <button type="button" class="agent-tab-btn" onclick="switchAgentModalTab('{{ c.id }}', 'discipline', this)" style="padding: 10px 14px; font-size: 12.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer;">
-        ⏱️ Jornada & Pausas ({{ c.inactivity_gaps|length }})
+         Jornada & Pausas ({{ c.inactivity_gaps|length }})
       </button>
     </div>
 
@@ -1599,7 +1599,7 @@ setInterval(function() {
         <!-- Live KP Calls -->
         <div style="margin-bottom: 20px;">
           <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #0284c7; display: flex; align-items: gap: 6px;">
-            📞 Llamadas Talked to KP ({{ c.kp_calls_list|length }})
+             Llamadas Talked to KP ({{ c.kp_calls_list|length }})
           </h4>
           {% if c.kp_calls_list %}
           <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -1640,7 +1640,7 @@ setInterval(function() {
         <!-- Tags #EKP y #TKP -->
         <div>
           <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #7c3aed; display: flex; align-items: center; gap: 6px;">
-            🏷️ Notas con #EKP y #TKP ({{ c.kp_tags_list|length }})
+             Notas con #EKP y #TKP ({{ c.kp_tags_list|length }})
           </h4>
           {% if c.kp_tags_list %}
           <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -1731,7 +1731,7 @@ setInterval(function() {
         <!-- Checkpoints -->
         <div style="margin-bottom: 20px;">
           <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #1e293b;">
-            ⏰ Checkpoints de Jornada (Entrada, Almuerzo y Cierre)
+             Checkpoints de Jornada (Entrada, Almuerzo y Cierre)
           </h4>
           {% if c.discipline_records %}
           <div style="overflow-x: auto;">
@@ -1768,7 +1768,7 @@ setInterval(function() {
         <!-- Inactivity Gaps -->
         <div>
           <h4 style="margin: 0 0 10px; font-size: 13.5px; font-weight: 800; color: #dc2626;">
-            ⚠️ Pausas Inactivas Detectadas &ge; 10 min ({{ c.inactivity_gaps|length }})
+             Pausas Inactivas Detectadas &ge; 10 min ({{ c.inactivity_gaps|length }})
           </h4>
           {% if c.inactivity_gaps %}
           <div style="overflow-x: auto;">
@@ -1803,7 +1803,7 @@ setInterval(function() {
           </div>
           {% else %}
             <div style="padding: 16px; text-align: center; color: #059669; font-weight: 700; font-size: 12px;">
-              ✅ Cero pausas de inactividad &ge; 10 min en este período.
+               Cero pausas de inactividad &ge; 10 min en este período.
             </div>
           {% endif %}
         </div>

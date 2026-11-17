@@ -218,7 +218,7 @@ def register_report_routes(app):
             db.save_agent_kpis(week_number, res["per_user"])
 
             rc_msg = f" + {ringcentral_calls} RingCentral" if ringcentral_calls else ""
-            flash(f"✅ {week_label}: {total_calls} llamadas totales ({close_crm_calls} Close CRM{rc_msg} · {am_calls} AM / {pm_calls} PM), {kps} KPs.", "ok")
+            flash(f" {week_label}: {total_calls} llamadas totales ({close_crm_calls} Close CRM{rc_msg} · {am_calls} AM / {pm_calls} PM), {kps} KPs.", "ok")
         except Exception as e:
             flash(f"Error sincronizando con Close CRM: {e}", "err")
 

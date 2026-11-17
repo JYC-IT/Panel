@@ -302,7 +302,7 @@ def register_campaign_routes(app):
                     force_refresh=True,
                     include_all_commercials=True
                 )
-                flash("✅ Métricas comerciales de Close CRM sincronizadas en vivo.", "ok")
+                flash(" Métricas comerciales de Close CRM sincronizadas en vivo.", "ok")
             except Exception as e:
                 flash(f"Error sincronizando métricas comerciales: {e}", "error")
             return redirect(target_url)
@@ -310,6 +310,6 @@ def register_campaign_routes(app):
         # Sincronización general en segundo plano para evitar bloqueos por tiempo de espera
         import threading
         threading.Thread(target=sync.run_all, daemon=True).start()
-        flash("🔄 Sincronización de campañas y respuestas iniciada en segundo plano.", "ok")
+        flash(" Sincronización de campañas y respuestas iniciada en segundo plano.", "ok")
         return redirect(target_url)
 

@@ -43,7 +43,7 @@ def main(argv):
         if not user:
             sys.exit(f"No existe el usuario «{username}».")
         auth.set_password(user["id"], _ask_password())
-        print(f"✅ Contraseña de «{username}» actualizada.")
+        print(f" Contraseña de «{username}» actualizada.")
         return
 
     username = argv[0] if len(argv) > 0 else input("Usuario (ej. hernan): ")
@@ -52,8 +52,8 @@ def main(argv):
     try:
         auth.create_user(username, name, _ask_password(), role.strip().lower())
     except ValueError as e:
-        sys.exit(f"❌ {e}")
-    print(f"✅ Usuario «{username.strip().lower()}» creado con rol {role}.")
+        sys.exit(f" {e}")
+    print(f" Usuario «{username.strip().lower()}» creado con rol {role}.")
 
 
 if __name__ == "__main__":

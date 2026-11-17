@@ -47,9 +47,9 @@
           {% endif %}
         </div>
         <div style="font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
-          <span>✉ {{ c.email }}</span>
-          <span>⏰ Horario: <strong>{{ c.schedule_label }}</strong></span>
-          <span>📅 Días hábiles en rango: <strong>{{ data.business_days }}</strong></span>
+          <span> {{ c.email }}</span>
+          <span> Horario: <strong>{{ c.schedule_label }}</strong></span>
+          <span> Días hábiles en rango: <strong>{{ data.business_days }}</strong></span>
         </div>
       </div>
     </div>
@@ -122,7 +122,7 @@
         </span>
       </div>
       <div style="font-size: 11.5px; color: #475569; margin-top: 4px;">
-        📞 Live KP: <strong>{{ c.live_kp }}</strong> | ✉ #EKP: <strong>{{ c.ekp }}</strong> | 💬 #TKP: <strong>{{ c.tkp }}</strong>
+         Live KP: <strong>{{ c.live_kp }}</strong> |  #EKP: <strong>{{ c.ekp }}</strong> |  #TKP: <strong>{{ c.tkp }}</strong>
       </div>
       <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
         Efectividad por llamada: <strong>{{ c.effectiveness }}%</strong>
@@ -176,16 +176,16 @@
 <!-- NAVEGACIÓN POR PESTAÑAS (TABS) -->
 <div style="display: flex; gap: 8px; border-bottom: 2px solid var(--border); margin-bottom: 20px; overflow-x: auto;">
   <button type="button" class="tab-btn active" onclick="switchReportTab('tabCalls', this)" style="padding: 10px 18px; font-size: 13.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid var(--brand); color: var(--brand); cursor: pointer; display: flex; align-items: center; gap: 6px;">
-    <span>📞</span> Llamadas ({{ c.calls_list|length }})
+    Llamadas ({{ c.calls_list|length }})
   </button>
   <button type="button" class="tab-btn" onclick="switchReportTab('tabKpis', this)" style="padding: 10px 18px; font-size: 13.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px;">
-    <span>🎯</span> KPIs Marcados ({{ c.total_kps }})
+    KPIs Marcados ({{ c.total_kps }})
   </button>
   <button type="button" class="tab-btn" onclick="switchReportTab('tabOpps', this)" style="padding: 10px 18px; font-size: 13.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px;">
-    <span>💼</span> Oportunidades ({{ c.opportunities|length }})
+    Oportunidades ({{ c.opportunities|length }})
   </button>
   <button type="button" class="tab-btn" onclick="switchReportTab('tabDiscipline', this)" style="padding: 10px 18px; font-size: 13.5px; font-weight: 800; border: none; background: none; border-bottom: 3px solid transparent; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; gap: 6px;">
-    <span>⏱️</span> Jornada e Inactividad ({{ c.inactivity_gaps|length }})
+    <span></span> Jornada e Inactividad ({{ c.inactivity_gaps|length }})
   </button>
 </div>
 
@@ -292,7 +292,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
       <div>
         <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #0284c7; display: flex; align-items: center; gap: 8px;">
-          <span>📞</span> Live KP Talk — Llamadas Clave con Contactos Decisores ({{ c.kp_calls_list|length }})
+          Live KP Talk — Llamadas Clave con Contactos Decisores ({{ c.kp_calls_list|length }})
         </h3>
         <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-secondary);">
           Llamadas donde el asesor seleccionó el resultado "Talked to KP" en Close CRM, auditadas con Inteligencia Artificial.
@@ -355,7 +355,7 @@
   <!-- Subsección 2: KPIs en Notas (#EKP y #TKP) -->
   <div class="executive-panel" style="padding: 20px 24px;">
     <h3 style="margin: 0 0 14px; font-size: 16px; font-weight: 800; color: #7c3aed; display: flex; align-items: center; gap: 8px;">
-      <span>🏷️</span> KPIs por Hashtag (#EKP y #TKP) con Evidencia ({{ c.kp_tags_list|length }})
+      <span></span> KPIs por Hashtag (#EKP y #TKP) con Evidencia ({{ c.kp_tags_list|length }})
     </h3>
 
     {% if c.kp_tags_list %}
@@ -416,7 +416,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
       <div>
         <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #059669; display: flex; align-items: center; gap: 8px;">
-          <span>💼</span> Oportunidades Creadas por {{ c.name }} ({{ c.opportunities|length }})
+          Oportunidades Creadas por {{ c.name }} ({{ c.opportunities|length }})
         </h3>
         <p style="margin: 2px 0 0; font-size: 12px; color: var(--text-secondary);">
           Oportunidades de Ventas y Compras abiertas en Close CRM durante el rango de fechas seleccionado.
@@ -498,7 +498,7 @@
   <!-- Checkpoints de Jornada -->
   <div class="executive-panel" style="padding: 20px 24px; margin-bottom: 20px;">
     <h3 style="margin: 0 0 14px; font-size: 16px; font-weight: 800; color: #1e293b; display: flex; align-items: center; gap: 8px;">
-      <span>⏰</span> Checkpoints de Entrada, Almuerzo y Cierre Diario
+      Checkpoints de Entrada, Almuerzo y Cierre Diario
     </h3>
     {% if c.discipline_records %}
     <div style="overflow-x: auto;">
@@ -561,7 +561,7 @@
   <!-- Detalle de Pausas de Inactividad >= 10m -->
   <div class="executive-panel" style="padding: 20px 24px;">
     <h3 style="margin: 0 0 14px; font-size: 16px; font-weight: 800; color: #dc2626; display: flex; align-items: center; gap: 8px;">
-      <span>⚠️</span> Alertas de Inactividad (&ge; 10 min entre llamadas) ({{ c.inactivity_gaps|length }})
+      <span></span> Alertas de Inactividad (&ge; 10 min entre llamadas) ({{ c.inactivity_gaps|length }})
     </h3>
 
     {% if c.inactivity_gaps %}
@@ -619,7 +619,7 @@
     </div>
     {% else %}
       <div style="padding: 28px; text-align: center; color: #059669; font-weight: 700; font-size: 13px;">
-        ✅ ¡Excelente disciplina! No se registraron pausas inactivas injustificadas &ge; 10 min en este período.
+         ¡Excelente disciplina! No se registraron pausas inactivas injustificadas &ge; 10 min en este período.
       </div>
     {% endif %}
   </div>

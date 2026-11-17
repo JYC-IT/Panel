@@ -367,7 +367,7 @@ def audit_agent_day(user_id, audit_date=None, force_refresh=False):
         elif dur <= 30 and not note:
             disposition_notes.append("Rushed call / No notes")
         if c.get("disposition") == KP_OUTCOME_ID:
-            disposition_notes.append("🌟 Live KP Connect")
+            disposition_notes.append(" Live KP Connect")
         if note:
             disposition_notes.append(note[:120])
 
