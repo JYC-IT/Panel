@@ -138,6 +138,14 @@ COMMERCIAL_SCHEDULES = {
 }
 
 _DASHBOARD_CACHE = {}
+_DAY_CALLS_CACHE = {}
+
+
+def clear_cache():
+    """Limpia la caché de datos comerciales y llamadas diarias para forzar sincronización fresca."""
+    global _DASHBOARD_CACHE, _DAY_CALLS_CACHE
+    _DASHBOARD_CACHE.clear()
+    _DAY_CALLS_CACHE.clear()
 
 
 def _get_auth():
@@ -236,8 +244,8 @@ def _resolve_lead_names(lead_ids, auth):
     if not missing or not auth:
         return names_map
 
-    # Priorizar los primeros 80 faltantes (llamadas KP y notas #EKP/#TKP primero)
-    to_fetch = missing[:80]
+    # Priorizar hasta 25 leads faltantes para evitar 429 de rate limit en Close CRM
+    to_fetch = missing[:25]
 
     def _fetch_one(lid):
         try:
@@ -245,7 +253,7 @@ def _resolve_lead_names(lead_ids, auth):
                 f"{BASE_URL}/lead/{lid}/",
                 auth=auth,
                 params={"_fields": "id,display_name"},
-                timeout=8,
+                timeout=5,
             )
             if r.status_code == 200:
                 data = r.json()
@@ -257,7 +265,7 @@ def _resolve_lead_names(lead_ids, auth):
         return lid, None
 
     newly_resolved = {}
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:
         for lid, name in pool.map(_fetch_one, to_fetch):
             if name:
                 names_map[lid] = name
@@ -619,63 +627,100 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         now_local = datetime.now(local_tz)
         today_str = now_local.strftime("%Y-%m-%d")
 
-        try:
+        def _fetch_calls_for_day(day_s, force_fresh=False):
+            if not force_fresh and day_s < today_str and day_s in _DAY_CALLS_CACHE:
+                return list(_DAY_CALLS_CACHE[day_s])
+
+            s_iso = f"{day_s}T00:00:00-05:00"
+            e_iso = f"{day_s}T23:59:59-05:00"
             skip = 0
+            day_calls = []
             while True:
                 r = requests.get(
                     f"{BASE_URL}/activity/call/",
                     auth=auth,
                     params={
-                        "date_created__gte": start_iso,
-                        "date_created__lte": end_iso,
+                        "date_created__gte": s_iso,
+                        "date_created__lte": e_iso,
                         "_limit": 100,
                         "_skip": skip,
                         "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted",
                     },
-                    timeout=25
+                    timeout=20
                 )
                 if r.status_code != 200:
                     break
-                data = r.json().get("data", [])
-                for c in data:
-                    uid = c.get("user_id")
-                    raw_date = c.get("date_created")
-                    if not uid or not raw_date or uid not in COMMERCIAL_MAP:
-                        continue
-                    if c.get("outcome_id") == KP_OUTCOME_ID:
-                        kp_calls.append(c)
-                    try:
-                        clean_dt = raw_date.replace("Z", "+00:00")
-                        dt_utc = datetime.fromisoformat(clean_dt)
-                        dt_local = dt_utc.astimezone(local_tz)
-                        day_str = dt_local.strftime("%Y-%m-%d")
-                        time_str = dt_local.strftime("%I:%M %p")
-                        dur_sec = int(c.get("duration") or 0)
-                        dur_human = f"{dur_sec // 60}m {dur_sec % 60:02d}s" if dur_sec else "0s"
-                        is_kp = c.get("outcome_id") == KP_OUTCOME_ID
-
-                        calls_by_user[uid].append({
-                            "id": c.get("id"),
-                            "date": day_str,
-                            "time": time_str,
-                            "datetime": dt_local.strftime("%Y-%m-%d %I:%M %p"),
-                            "direction": c.get("direction") or "outbound",
-                            "duration": dur_sec,
-                            "duration_human": dur_human,
-                            "phone": c.get("remote_phone_formatted") or c.get("remote_phone") or "-",
-                            "lead_id": c.get("lead_id"),
-                            "lead_name": c.get("lead_name") or "Sin Lead",
-                            "is_kp": is_kp,
-                            "outcome_label": "Live KP Talk" if is_kp else ("Contestada" if dur_sec > 0 else "Sin Respuesta"),
-                            "close_url": f"https://app.close.com/lead/{c.get('lead_id')}/" if c.get("lead_id") else "https://app.close.com/",
-                            "dt_sort": dt_local,
-                        })
-                        user_day_calls[(uid, day_str)].append((dt_local, c))
-                    except Exception:
-                        pass
-                if not r.json().get("has_more") or len(data) < 100:
+                items = r.json().get("data", [])
+                day_calls.extend(items)
+                if not r.json().get("has_more") or len(items) < 100:
                     break
-                skip += len(data)
+                skip += len(items)
+
+            if day_s < today_str:
+                _DAY_CALLS_CACHE[day_s] = list(day_calls)
+            return day_calls
+
+        try:
+            d_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            d_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except Exception:
+            d_start = date.today()
+            d_end = date.today()
+
+        if d_start > d_end:
+            d_start, d_end = d_end, d_start
+
+        days_list = []
+        cur_d = d_start
+        while cur_d <= d_end:
+            days_list.append(cur_d.strftime("%Y-%m-%d"))
+            cur_d += timedelta(days=1)
+
+        raw_calls = []
+        if len(days_list) <= 1:
+            raw_calls = _fetch_calls_for_day(days_list[0], force_fresh=force_refresh)
+        else:
+            with ThreadPoolExecutor(max_workers=min(5, len(days_list))) as d_pool:
+                for day_calls in d_pool.map(lambda d: _fetch_calls_for_day(d, force_fresh=force_refresh), days_list):
+                    raw_calls.extend(day_calls)
+
+        try:
+            for c in raw_calls:
+                uid = c.get("user_id")
+                raw_date = c.get("date_created")
+                if not uid or not raw_date or uid not in COMMERCIAL_MAP:
+                    continue
+                if c.get("outcome_id") == KP_OUTCOME_ID:
+                    kp_calls.append(c)
+                try:
+                    clean_dt = raw_date.replace("Z", "+00:00")
+                    dt_utc = datetime.fromisoformat(clean_dt)
+                    dt_local = dt_utc.astimezone(local_tz)
+                    day_str = dt_local.strftime("%Y-%m-%d")
+                    time_str = dt_local.strftime("%I:%M %p")
+                    dur_sec = int(c.get("duration") or 0)
+                    dur_human = f"{dur_sec // 60}m {dur_sec % 60:02d}s" if dur_sec else "0s"
+                    is_kp = c.get("outcome_id") == KP_OUTCOME_ID
+
+                    calls_by_user[uid].append({
+                        "id": c.get("id"),
+                        "date": day_str,
+                        "time": time_str,
+                        "datetime": dt_local.strftime("%Y-%m-%d %I:%M %p"),
+                        "direction": c.get("direction") or "outbound",
+                        "duration": dur_sec,
+                        "duration_human": dur_human,
+                        "phone": c.get("remote_phone_formatted") or c.get("remote_phone") or "-",
+                        "lead_id": c.get("lead_id"),
+                        "lead_name": c.get("lead_name") or "Sin Lead",
+                        "is_kp": is_kp,
+                        "outcome_label": "Live KP Talk" if is_kp else ("Contestada" if dur_sec > 0 else "Sin Respuesta"),
+                        "close_url": f"https://app.close.com/lead/{c.get('lead_id')}/" if c.get("lead_id") else "https://app.close.com/",
+                        "dt_sort": dt_local,
+                    })
+                    user_day_calls[(uid, day_str)].append((dt_local, c))
+                except Exception:
+                    pass
 
             # Analizar intervalos entre llamadas para cada asesor por cada día laboral
             for (uid, day_str), ucalls in user_day_calls.items():

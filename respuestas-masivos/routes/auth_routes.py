@@ -20,7 +20,10 @@ def register_auth_routes(app):
                 session.clear()
                 session["user_id"] = user["id"]
                 token = auth.generate_auth_token(user["id"])
-                flash(f"¡Bienvenido, {user['name']}!", "ok")
+                flash(f"¡Bienvenida, {user['name']}!" if str(user.get("username", "")).lower() == "paula" else f"¡Bienvenido, {user['name']}!", "ok")
+
+                if str(user.get("username", "")).lower() == "paula":
+                    next_url = url_for("weekly_report")
 
                 # Limpiar cualquier auth_token previo en next_url y adjuntar el token del usuario nuevo
                 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse

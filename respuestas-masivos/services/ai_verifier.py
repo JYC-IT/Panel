@@ -63,33 +63,36 @@ def _get_cached_verifications(activity_ids):
 
 
 def _save_verification(record):
-    with db.get_conn() as conn:
-        conn.execute(
-            """INSERT INTO ai_verifications
-               (activity_id, activity_type, user_id, verdict, category, score, reason, evidence, summary, model_used, analyzed_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-               ON CONFLICT(activity_id) DO UPDATE SET
-                   verdict=excluded.verdict,
-                   category=excluded.category,
-                   score=excluded.score,
-                   reason=excluded.reason,
-                   evidence=excluded.evidence,
-                   summary=excluded.summary,
-                   model_used=excluded.model_used,
-                   analyzed_at=CURRENT_TIMESTAMP""",
-            (
-                record["activity_id"],
-                record["activity_type"],
-                record.get("user_id", ""),
-                record["verdict"],
-                record.get("category", ""),
-                int(record.get("score", 0)),
-                record.get("reason", ""),
-                record.get("evidence", ""),
-                record.get("summary", ""),
-                record.get("model_used", "Close-AI-Audit"),
-            ),
-        )
+    try:
+        with db.get_conn() as conn:
+            conn.execute(
+                """INSERT INTO ai_verifications
+                   (activity_id, activity_type, user_id, verdict, category, score, reason, evidence, summary, model_used, analyzed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                   ON CONFLICT(activity_id) DO UPDATE SET
+                       verdict=excluded.verdict,
+                       category=excluded.category,
+                       score=excluded.score,
+                       reason=excluded.reason,
+                       evidence=excluded.evidence,
+                       summary=excluded.summary,
+                       model_used=excluded.model_used,
+                       analyzed_at=CURRENT_TIMESTAMP""",
+                (
+                    record["activity_id"],
+                    record["activity_type"],
+                    record.get("user_id", ""),
+                    record["verdict"],
+                    record.get("category", ""),
+                    int(record.get("score", 0)),
+                    record.get("reason", ""),
+                    record.get("evidence", ""),
+                    record.get("summary", ""),
+                    record.get("model_used", "Close-AI-Audit"),
+                ),
+            )
+    except Exception as e:
+        print(f"Notice: Caching AI verification to DB bypassed: {e}")
 
 
 def _format_utterances_dialogue(utterances, max_chars=4500):
@@ -543,7 +546,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
     cached = {} if force else _get_cached_verifications(ids)
     missing_records = [r for r in tagged_records if r["activity_id"] not in cached]
 
-    lead_ids_needed = list({r["lead_id"] for r in missing_records if r.get("lead_id")})
+    lead_ids_needed = list({r["lead_id"] for r in missing_records if r.get("lead_id")})[:20]
     lead_evidence_map = {}
 
     auth = close_crm._get_auth()
@@ -557,7 +560,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
                 f"{BASE_URL}/activity/email/",
                 auth=auth,
                 params={"lead_id": lid, "_limit": 10, "_fields": "id,direction,subject,body_text,date_created"},
-                timeout=12,
+                timeout=6,
             )
             if r_em.status_code == 200:
                 emails = r_em.json().get("data", [])
@@ -568,7 +571,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
                 f"{BASE_URL}/activity/sms/",
                 auth=auth,
                 params={"lead_id": lid, "_limit": 10, "_fields": "id,direction,text,date_created"},
-                timeout=12,
+                timeout=6,
             )
             if r_sm.status_code == 200:
                 sms = r_sm.json().get("data", [])
@@ -577,7 +580,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
         return lid, emails, sms
 
     if lead_ids_needed:
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        with ThreadPoolExecutor(max_workers=4) as pool:
             for lid, ems, sms_l in pool.map(_fetch_lead_comms, lead_ids_needed):
                 lead_evidence_map[lid] = (ems, sms_l)
 

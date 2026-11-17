@@ -90,8 +90,9 @@ def verify(username, password):
                WHERE username = ? 
                   OR username = ?
                   OR (? IN ('jcordoba', 'juancordoba') AND username IN ('jcordoba', 'juancordoba'))
-                  OR (? IN ('julian', 'julianprado', 'jprado', 'jp') AND username IN ('julian', 'julianprado', 'jprado', 'jp'))""",
-            (raw_user, user_handle, user_handle, user_handle)
+                  OR (? IN ('julian', 'julianprado', 'jprado', 'jp') AND username IN ('julian', 'julianprado', 'jprado', 'jp'))
+                  OR (? IN ('paula', 'pau') AND username IN ('paula', 'pau'))""",
+            (raw_user, user_handle, user_handle, user_handle, user_handle)
         ).fetchone()
         if not row or not row["active"] or not check_password_hash(row["password_hash"], password or ""):
             return None
@@ -136,6 +137,14 @@ def bootstrap_admin():
             print("  Usuario lector «julianprado» inicializado.")
         else:
             set_password(jp_row["id"], "Jyc2026*Julian")
+
+        # 5. Paula (Lector enfocado exclusivamente en métricas de KPI semanales)
+        p_row = conn.execute("SELECT id FROM users WHERE username IN ('paula', 'pau')").fetchone()
+        if not p_row:
+            create_user("paula", "Paula", "Jyc2026*Paula", "lector")
+            print("  Usuario lector «paula» inicializado.")
+        else:
+            set_password(p_row["id"], "Jyc2026*Paula")
 
         # 3. Soporte opcional desde variables de entorno si se configuran
         env_user = os.getenv("ADMIN_USERNAME", "").strip()
@@ -191,6 +200,12 @@ def init_app(app):
             if request.method == "GET":
                 return redirect(url_for("login", next=request.full_path.rstrip("?")))
             return redirect(url_for("login"))
+
+        # Perfil enfocado para Paula: acceso rápido y exclusivo a Métricas Semanales de KPIs
+        if g.user and str(g.user.get("username", "")).lower() == "paula":
+            allowed_for_paula = ("weekly_report", "sync_weekly_close_kpis_route", "update_weekly_outreach", "static", "logout")
+            if request.endpoint and request.endpoint not in allowed_for_paula and request.endpoint not in PUBLIC_ENDPOINTS:
+                return redirect(url_for("weekly_report"))
 
     @app.context_processor
     def _inject_user():

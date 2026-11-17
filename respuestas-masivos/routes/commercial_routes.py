@@ -31,9 +31,9 @@ def get_date_presets():
     # Esta semana (Lunes a hoy)
     start_of_week = today - timedelta(days=today.weekday())
     
-    # Semana pasada (Lunes a Viernes pasado)
+    # Semana pasada (Lunes a Domingo pasado completo)
     start_last_week = start_of_week - timedelta(days=7)
-    end_last_week = start_last_week + timedelta(days=4)
+    end_last_week = start_of_week - timedelta(days=1)
     
     # Este mes (Día 1 a hoy)
     start_of_month = today.replace(day=1)
