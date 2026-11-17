@@ -283,7 +283,31 @@ def register_campaign_routes(app):
     @app.post("/sync")
     @auth.admin_required
     def sync_now():
-        for msg in sync.run_all():
-            flash(msg, "error" if "ERROR" in msg else "ok")
-        return redirect(request.referrer or url_for("index"))
+        from urllib.parse import urlparse, parse_qs
+        referrer = request.referrer or url_for("index")
+        parsed = urlparse(referrer)
+        query_params = parse_qs(parsed.query)
+
+        # Si el usuario pulsa 'Sincronizar Ahora' desde el Panel Comercial (/comerciales)
+        if "comercial" in parsed.path:
+            from services import commercial_dashboard
+            start_date = query_params.get("start_date", [None])[0]
+            end_date = query_params.get("end_date", [None])[0]
+            try:
+                commercial_dashboard.get_commercial_dashboard_data(
+                    start_date=start_date,
+                    end_date=end_date,
+                    force_refresh=True,
+                    include_all_commercials=True
+                )
+                flash("✅ Métricas comerciales de Close CRM sincronizadas en vivo.", "ok")
+            except Exception as e:
+                flash(f"Error sincronizando métricas comerciales: {e}", "error")
+            return redirect(referrer)
+
+        # Sincronización general en segundo plano para evitar bloqueos por tiempo de espera
+        import threading
+        threading.Thread(target=sync.run_all, daemon=True).start()
+        flash("🔄 Sincronización de campañas y respuestas iniciada en segundo plano.", "ok")
+        return redirect(referrer)
 

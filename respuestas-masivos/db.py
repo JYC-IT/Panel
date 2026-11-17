@@ -512,6 +512,7 @@ def _seed_weekly_kpis(conn):
         (25, "Week 25*", "Oct 19 - 23", 203, 432, 635, 2000, 51, 125, 8.03, "Hernan no estuvo", 135842, 0, 2130, 137972, 44067, 14.7, 23, 612, 6478),
         (26, "Week 26*", "Oct 26 - 30", 373, 283, 656, 2000, 57, 125, 8.69, "", 109982, 174, 199, 110355, 31886, 1.57, 0, 656, 501),
         (27, "Week 27*", "Nov 2 - 6", 238, 384, 622, 2000, 66, 125, 10.61, "+10 EKP - Opens reales humanos sin bots", 169842, 317, 0, 170159, 32596, 4.35, 0, 622, 7409),
+        (28, "Week 28", "Nov 9 - 13", 267, 396, 663, 2000, 71, 125, 10.71, "", 146708, 328, 0, 147036, 37261, 3.91, 0, 663, 5755),
     ]
 
     conn.executemany(
@@ -522,6 +523,18 @@ def _seed_weekly_kpis(conn):
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         weeks_data,
     )
+
+    # Asegurar que la Semana 28 tenga los envíos reales de Constant Contact y métricas registradas
+    conn.execute("""
+        UPDATE weekly_team_kpis
+        SET outreach_emails_cc = 146708,
+            outreach_emails_instantly = 328,
+            total_outreach = 147036,
+            opens_count = 37261,
+            clicks_count = 5755,
+            click_rate = 3.91
+        WHERE week_number = 28 AND (outreach_emails_cc = 0 OR outreach_emails_cc IS NULL)
+    """)
 
     w27_agents = [
         (27, "user_7cXDrv9AKnoVTSOnXBJo2oYXmUrFRDG40sIYVhmDwHA", "Juan Abuchaibe", 149, 8, 5.37),

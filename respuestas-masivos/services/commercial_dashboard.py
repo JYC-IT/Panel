@@ -436,7 +436,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "date_created__gte": start_iso,
                         "date_created__lte": end_iso,
                         "_limit": 100,
-                        "_skip": skip
+                        "_skip": skip,
+                        "_fields": "id,user_id,user_name,lead_name,pipeline_id,pipeline_name,status_label,value,date_created",
                     },
                     timeout=20
                 )
@@ -492,7 +493,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "date_created__gte": start_iso,
                         "date_created__lte": end_iso,
                         "_limit": 100,
-                        "_skip": skip
+                        "_skip": skip,
+                        "_fields": "id,user_id,user_name,lead_id,lead_name,note,date_created",
                     },
                     timeout=20
                 )
@@ -553,7 +555,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "date_created__gte": start_iso,
                         "date_created__lte": end_iso,
                         "_limit": 100,
-                        "_skip": skip
+                        "_skip": skip,
+                        "_fields": "id,created_by",
                     },
                     timeout=20
                 )
@@ -584,7 +587,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "date_created__gte": start_iso,
                         "date_created__lte": end_iso,
                         "_limit": 100,
-                        "_skip": skip
+                        "_skip": skip,
+                        "_fields": "id,user_id,created_by",
                     },
                     timeout=20
                 )
@@ -624,7 +628,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "date_created__gte": start_iso,
                         "date_created__lte": end_iso,
                         "_limit": 100,
-                        "_skip": skip
+                        "_skip": skip,
+                        "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted",
                     },
                     timeout=25
                 )
@@ -1087,12 +1092,12 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         f_ai_calls = ai_pool.submit(
             ai_verifier.verify_kp_calls_batch,
             call_gaps.get("kp_calls", []),
-            force=force_refresh,
+            force=False,
         )
         f_ai_tags = ai_pool.submit(
             ai_verifier.verify_tagged_kps_batch,
             notes_tags.get("records", []),
-            force=force_refresh,
+            force=False,
         )
         try:
             ai_call_audits = f_ai_calls.result()
@@ -1344,9 +1349,13 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "ai_summary": ai_summary,
     }
 
+    today_str = date.today().isoformat()
+    # Cache por 24 horas para periodos pasados historicos; 5 minutos para el rango actual
+    cache_ttl = 86400 if end_date < today_str else 300
+
     _DASHBOARD_CACHE[cache_key] = {
         "data": result,
-        "expires_at": time.time() + 120  # 2 minutos de cache
+        "expires_at": time.time() + cache_ttl
     }
 
     return result if include_all_commercials else _filter_dashboard_for_team(result, HERNAN_TEAM_IDS)
