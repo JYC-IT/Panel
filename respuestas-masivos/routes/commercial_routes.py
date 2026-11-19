@@ -78,6 +78,7 @@ def register_commercial_routes(app):
         start_date = request.args.get("start_date") or today_iso
         end_date = request.args.get("end_date") or today_iso
         force_refresh = request.args.get("refresh") in ("1", "true", "True")
+        open_modal = request.args.get("open_modal") or ""
 
         data = commercial_dashboard.get_commercial_dashboard_data(
             start_date=start_date,
@@ -92,6 +93,7 @@ def register_commercial_routes(app):
             "commercial_dashboard.html",
             data=data,
             presets=presets,
+            open_modal=open_modal,
             active_page="commercial_dashboard"
         )
 

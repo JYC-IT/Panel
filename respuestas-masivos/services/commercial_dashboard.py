@@ -635,28 +635,31 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             e_iso = f"{day_s}T23:59:59-05:00"
             skip = 0
             day_calls = []
-            while True:
-                r = requests.get(
-                    f"{BASE_URL}/activity/call/",
-                    auth=auth,
-                    params={
-                        "date_created__gte": s_iso,
-                        "date_created__lte": e_iso,
-                        "_limit": 100,
-                        "_skip": skip,
-                        "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted",
-                    },
-                    timeout=20
-                )
-                if r.status_code != 200:
-                    break
-                items = r.json().get("data", [])
-                day_calls.extend(items)
-                if not r.json().get("has_more") or len(items) < 100:
-                    break
-                skip += len(items)
+            try:
+                while True:
+                    r = requests.get(
+                        f"{BASE_URL}/activity/call/",
+                        auth=auth,
+                        params={
+                            "date_created__gte": s_iso,
+                            "date_created__lte": e_iso,
+                            "_limit": 100,
+                            "_skip": skip,
+                            "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted",
+                        },
+                        timeout=25
+                    )
+                    if r.status_code != 200:
+                        break
+                    items = r.json().get("data", [])
+                    day_calls.extend(items)
+                    if not r.json().get("has_more") or len(items) < 100:
+                        break
+                    skip += len(items)
+            except Exception as e:
+                print(f"Error fetching calls for day {day_s}: {e}")
 
-            if day_s < today_str:
+            if day_s < today_str and day_calls:
                 _DAY_CALLS_CACHE[day_s] = list(day_calls)
             return day_calls
 

@@ -61,7 +61,7 @@
         {% for k, p in presets.items() %}
           <a href="{{ url_for('commercial_agent_report_view', user_id=c.id, start_date=p.start, end_date=p.end) }}"
              class="badge-pill"
-             onclick="applyAgentPreset('{{ p.start }}', '{{ p.end }}', '{{ p.label }}', event)"
+             onclick="showLoading('Cargando {{ p.label }}...')"
              style="background:{% if data.start_date == p.start and data.end_date == p.end %}var(--brand); color:#fff; border-color:var(--brand);{% else %}#f8fafc; color:var(--text-secondary); border:1px solid var(--border);{% endif %} text-decoration:none; font-weight:700; font-size:12px; padding:4px 11px; transition:all 0.15s; cursor:pointer;">
             {{ p.label }}
           </a>
@@ -70,6 +70,9 @@
       {% endif %}
 
       <form id="agentFilterForm" method="get" action="{{ url_for('commercial_agent_report_view', user_id=c.id) }}" onsubmit="showLoading('Filtrando reporte...')" style="display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap;">
+        {% if current_auth_token %}
+          <input type="hidden" name="auth_token" value="{{ current_auth_token }}">
+        {% endif %}
         <div>
           <label style="font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 2px;">Desde:</label>
           <input type="date" name="start_date" value="{{ data.start_date }}" style="padding: 6px 10px; font-size: 12.5px; font-weight: 600;">
@@ -627,19 +630,7 @@
 
 <script>
 function applyAgentPreset(start, end, label, e) {
-  if (e && e.preventDefault) e.preventDefault();
-  const form = document.getElementById('agentFilterForm');
-  if (form) {
-    const startInp = form.querySelector('input[name="start_date"]');
-    const endInp = form.querySelector('input[name="end_date"]');
-    if (startInp) startInp.value = start;
-    if (endInp) endInp.value = end;
-    showLoading('Cargando ' + label + '...');
-    form.submit();
-  } else {
-    showLoading('Cargando ' + label + '...');
-    window.location.href = "{{ url_for('commercial_agent_report_view', user_id=c.id) }}?start_date=" + encodeURIComponent(start) + "&end_date=" + encodeURIComponent(end);
-  }
+  showLoading('Cargando ' + label + '...');
 }
 
 function switchReportTab(tabId, btn) {

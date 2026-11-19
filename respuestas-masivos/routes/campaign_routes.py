@@ -281,7 +281,7 @@ def register_campaign_routes(app):
         return redirect(url_for("index"))
 
     @app.post("/sync")
-    @auth.admin_required
+    @auth.login_required
     def sync_now():
         from urllib.parse import urlparse, parse_qs
         target_url = request.form.get("next_url") or request.referrer or url_for("index")
@@ -289,7 +289,7 @@ def register_campaign_routes(app):
         path_lower = (parsed.path or "").lower()
         query_params = parse_qs(parsed.query)
 
-        # Si el usuario pulsa 'Sincronizar Ahora' desde el Panel Comercial (/comerciales o /commercial-dashboard)
+        # Si el usuario pulsa 'Sincronizar Ahora' desde el Panel Comercial (/comerciales o /commercial-dashboard o reportes)
         if "commercial" in path_lower or "comercial" in path_lower:
             from services import commercial_dashboard
             start_date = query_params.get("start_date", [None])[0]
@@ -302,14 +302,19 @@ def register_campaign_routes(app):
                     force_refresh=True,
                     include_all_commercials=True
                 )
-                flash(" Métricas comerciales de Close CRM sincronizadas en vivo.", "ok")
+                flash(" Metricas comerciales de Close CRM sincronizadas en vivo.", "ok")
             except Exception as e:
-                flash(f"Error sincronizando métricas comerciales: {e}", "error")
+                flash(f"Error sincronizando metricas comerciales: {e}", "error")
             return redirect(target_url)
 
-        # Sincronización general en segundo plano para evitar bloqueos por tiempo de espera
+        # Sincronizacion general de campanas Constant Contact (solo admin)
+        user = getattr(g, "user", None)
+        if not user or user.get("role") != "admin":
+            flash("La sincronizacion de campanas masivas es solo para administradores.", "error")
+            return redirect(target_url)
+
         import threading
         threading.Thread(target=sync.run_all, daemon=True).start()
-        flash(" Sincronización de campañas y respuestas iniciada en segundo plano.", "ok")
+        flash(" Sincronizacion de campanas y respuestas iniciada en segundo plano.", "ok")
         return redirect(target_url)
 
