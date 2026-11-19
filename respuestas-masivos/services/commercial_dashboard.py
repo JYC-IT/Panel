@@ -386,14 +386,35 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
 
     cache_key = f"comm_dash_{start_date}_{end_date}"
     now_ts = time.time()
-    if not force_refresh and cache_key in _DASHBOARD_CACHE:
-        entry = _DASHBOARD_CACHE[cache_key]
-        if now_ts < entry["expires_at"]:
-            cached_res = entry["data"]
-            return cached_res if include_all_commercials else _filter_dashboard_for_team(cached_res, HERNAN_TEAM_IDS)
+    if not force_refresh:
+        if cache_key in _DASHBOARD_CACHE:
+            entry = _DASHBOARD_CACHE[cache_key]
+            if now_ts < entry["expires_at"]:
+                cached_res = entry["data"]
+                return cached_res if include_all_commercials else _filter_dashboard_for_team(cached_res, HERNAN_TEAM_IDS)
+        db_cached = db.get_cached_dashboard(cache_key)
+        if db_cached:
+            _DASHBOARD_CACHE[cache_key] = {"data": db_cached, "expires_at": now_ts + 300}
+            return db_cached if include_all_commercials else _filter_dashboard_for_team(db_cached, HERNAN_TEAM_IDS)
 
     start_iso = f"{start_date}T00:00:00-05:00"
     end_iso = f"{end_date}T23:59:59-05:00"
+
+    try:
+        d_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        d_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except Exception:
+        d_start = date.today()
+        d_end = date.today()
+
+    if d_start > d_end:
+        d_start, d_end = d_end, d_start
+
+    days_list = []
+    cur_d = d_start
+    while cur_d <= d_end:
+        days_list.append(cur_d.strftime("%Y-%m-%d"))
+        cur_d += timedelta(days=1)
 
     business_days = calculate_business_days(start_date, end_date)
     period_target_calls = business_days * DAILY_GOAL_CALLS
@@ -485,6 +506,66 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         return opps_data
 
     # --- 3. Notas con #EKP y #TKP ---
+    def _fetch_notes_slice(s_iso, e_iso):
+        slice_ekp = defaultdict(int)
+        slice_tkp = defaultdict(int)
+        slice_recs = []
+        skip = 0
+        while True:
+            r = requests.get(
+                f"{BASE_URL}/activity/note/",
+                auth=auth,
+                params={
+                    "date_created__gte": s_iso,
+                    "date_created__lte": e_iso,
+                    "_limit": 100,
+                    "_skip": skip,
+                    "_fields": "id,user_id,user_name,lead_id,lead_name,note,date_created",
+                },
+                timeout=20
+            )
+            if r.status_code != 200:
+                break
+            notes = r.json().get("data", [])
+            for n in notes:
+                uid = n.get("user_id")
+                if uid not in COMMERCIAL_MAP:
+                    continue
+                text = (n.get("note") or "").strip()
+                text_lower = text.lower()
+
+                is_ekp = "#ekp" in text_lower or "ekp" in text_lower.split()
+                is_tkp = "#tkp" in text_lower or "tkp" in text_lower.split()
+
+                if is_ekp:
+                    slice_ekp[uid] += 1
+                    slice_recs.append({
+                        "activity_id": n.get("id"),
+                        "type": "EKP",
+                        "user_id": uid,
+                        "user_name": n.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor"),
+                        "date": n.get("date_created"),
+                        "lead_id": n.get("lead_id"),
+                        "lead_name": n.get("lead_name") or "",
+                        "text": text
+                    })
+                if is_tkp:
+                    slice_tkp[uid] += 1
+                    slice_recs.append({
+                        "activity_id": n.get("id"),
+                        "type": "TKP",
+                        "user_id": uid,
+                        "user_name": n.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor"),
+                        "date": n.get("date_created"),
+                        "lead_id": n.get("lead_id"),
+                        "lead_name": n.get("lead_name") or "",
+                        "text": text
+                    })
+            if not r.json().get("has_more") or len(notes) < 100:
+                break
+            skip += len(notes)
+        return slice_ekp, slice_tkp, slice_recs
+
     def fetch_notes_tags():
         tags_data = {
             "ekp_by_user": defaultdict(int),
@@ -492,124 +573,111 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "records": []
         }
         try:
-            skip = 0
-            while True:
-                r = requests.get(
-                    f"{BASE_URL}/activity/note/",
-                    auth=auth,
-                    params={
-                        "date_created__gte": start_iso,
-                        "date_created__lte": end_iso,
-                        "_limit": 100,
-                        "_skip": skip,
-                        "_fields": "id,user_id,user_name,lead_id,lead_name,note,date_created",
-                    },
-                    timeout=20
-                )
-                if r.status_code != 200:
-                    break
-                notes = r.json().get("data", [])
-                for n in notes:
-                    uid = n.get("user_id")
-                    if uid not in COMMERCIAL_MAP:
-                        continue
-                    text = (n.get("note") or "").strip()
-                    text_lower = text.lower()
-                    
-                    is_ekp = "#ekp" in text_lower or "ekp" in text_lower.split()
-                    is_tkp = "#tkp" in text_lower or "tkp" in text_lower.split()
-
-                    if is_ekp:
-                        tags_data["ekp_by_user"][uid] += 1
-                        tags_data["records"].append({
-                            "activity_id": n.get("id"),
-                            "type": "EKP",
-                            "user_id": uid,
-                            "user_name": n.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor"),
-                            "date": n.get("date_created"),
-                            "lead_id": n.get("lead_id"),
-                            "lead_name": n.get("lead_name") or "",
-                            "text": text
-                        })
-                    if is_tkp:
-                        tags_data["tkp_by_user"][uid] += 1
-                        tags_data["records"].append({
-                            "activity_id": n.get("id"),
-                            "type": "TKP",
-                            "user_id": uid,
-                            "user_name": n.get("user_name") or COMMERCIAL_MAP.get(uid, {}).get("name", "Asesor"),
-                            "date": n.get("date_created"),
-                            "lead_id": n.get("lead_id"),
-                            "lead_name": n.get("lead_name") or "",
-                            "text": text
-                        })
-                if not r.json().get("has_more") or len(notes) < 100:
-                    break
-                skip += len(notes)
+            if len(days_list) <= 4:
+                ekp, tkp, recs = _fetch_notes_slice(start_iso, end_iso)
+                tags_data["ekp_by_user"] = ekp
+                tags_data["tkp_by_user"] = tkp
+                tags_data["records"] = recs
+            else:
+                chunks = [days_list[i:i + 5] for i in range(0, len(days_list), 5)]
+                slices = [(f"{c[0]}T00:00:00-05:00", f"{c[-1]}T23:59:59-05:00") for c in chunks]
+                with ThreadPoolExecutor(max_workers=min(8, len(slices))) as n_pool:
+                    for ekp, tkp, recs in n_pool.map(lambda s: _fetch_notes_slice(s[0], s[1]), slices):
+                        for u, cnt in ekp.items():
+                            tags_data["ekp_by_user"][u] += cnt
+                        for u, cnt in tkp.items():
+                            tags_data["tkp_by_user"][u] += cnt
+                        tags_data["records"].extend(recs)
         except Exception as e:
             print(f"Error fetching notes tags: {e}")
         return tags_data
 
     # --- 4. Tareas Set (creadas en el periodo) ---
+    def _fetch_tasks_set_slice(s_iso, e_iso):
+        slice_tasks = defaultdict(int)
+        skip = 0
+        while True:
+            r = requests.get(
+                f"{BASE_URL}/task/",
+                auth=auth,
+                params={
+                    "date_created__gte": s_iso,
+                    "date_created__lte": e_iso,
+                    "_limit": 100,
+                    "_skip": skip,
+                    "_fields": "id,created_by",
+                },
+                timeout=20
+            )
+            if r.status_code != 200:
+                break
+            tasks = r.json().get("data", [])
+            for t in tasks:
+                uid = t.get("created_by")
+                if uid in COMMERCIAL_MAP:
+                    slice_tasks[uid] += 1
+            if not r.json().get("has_more") or len(tasks) < 100:
+                break
+            skip += len(tasks)
+        return slice_tasks
+
     def fetch_tasks_set():
         tasks_by_user = defaultdict(int)
         try:
-            skip = 0
-            while True:
-                r = requests.get(
-                    f"{BASE_URL}/task/",
-                    auth=auth,
-                    params={
-                        "date_created__gte": start_iso,
-                        "date_created__lte": end_iso,
-                        "_limit": 100,
-                        "_skip": skip,
-                        "_fields": "id,created_by",
-                    },
-                    timeout=20
-                )
-                if r.status_code != 200:
-                    break
-                tasks = r.json().get("data", [])
-                for t in tasks:
-                    uid = t.get("created_by")
-                    if uid in COMMERCIAL_MAP:
-                        tasks_by_user[uid] += 1
-                if not r.json().get("has_more") or len(tasks) < 100:
-                    break
-                skip += len(tasks)
+            if len(days_list) <= 5:
+                tasks_by_user = _fetch_tasks_set_slice(start_iso, end_iso)
+            else:
+                chunks = [days_list[i:i + 7] for i in range(0, len(days_list), 7)]
+                slices = [(f"{c[0]}T00:00:00-05:00", f"{c[-1]}T23:59:59-05:00") for c in chunks]
+                with ThreadPoolExecutor(max_workers=min(6, len(slices))) as ts_pool:
+                    for s_tasks in ts_pool.map(lambda s: _fetch_tasks_set_slice(s[0], s[1]), slices):
+                        for u, cnt in s_tasks.items():
+                            tasks_by_user[u] += cnt
         except Exception as e:
             print(f"Error fetching tasks set: {e}")
         return tasks_by_user
 
     # --- 5. Tareas Done (completadas en el periodo) ---
+    def _fetch_tasks_done_slice(s_iso, e_iso):
+        slice_done = defaultdict(int)
+        skip = 0
+        while True:
+            r = requests.get(
+                f"{BASE_URL}/activity/task_completed/",
+                auth=auth,
+                params={
+                    "date_created__gte": s_iso,
+                    "date_created__lte": e_iso,
+                    "_limit": 100,
+                    "_skip": skip,
+                    "_fields": "id,user_id,created_by",
+                },
+                timeout=20
+            )
+            if r.status_code != 200:
+                break
+            done_list = r.json().get("data", [])
+            for item in done_list:
+                uid = item.get("user_id") or item.get("created_by")
+                if uid in COMMERCIAL_MAP:
+                    slice_done[uid] += 1
+            if not r.json().get("has_more") or len(done_list) < 100:
+                break
+            skip += len(done_list)
+        return slice_done
+
     def fetch_tasks_done():
         done_by_user = defaultdict(int)
         try:
-            skip = 0
-            while True:
-                r = requests.get(
-                    f"{BASE_URL}/activity/task_completed/",
-                    auth=auth,
-                    params={
-                        "date_created__gte": start_iso,
-                        "date_created__lte": end_iso,
-                        "_limit": 100,
-                        "_skip": skip,
-                        "_fields": "id,user_id,created_by",
-                    },
-                    timeout=20
-                )
-                if r.status_code != 200:
-                    break
-                done_list = r.json().get("data", [])
-                for item in done_list:
-                    uid = item.get("user_id") or item.get("created_by")
-                    if uid in COMMERCIAL_MAP:
-                        done_by_user[uid] += 1
-                if not r.json().get("has_more") or len(done_list) < 100:
-                    break
-                skip += len(done_list)
+            if len(days_list) <= 5:
+                done_by_user = _fetch_tasks_done_slice(start_iso, end_iso)
+            else:
+                chunks = [days_list[i:i + 7] for i in range(0, len(days_list), 7)]
+                slices = [(f"{c[0]}T00:00:00-05:00", f"{c[-1]}T23:59:59-05:00") for c in chunks]
+                with ThreadPoolExecutor(max_workers=min(6, len(slices))) as td_pool:
+                    for s_done in td_pool.map(lambda s: _fetch_tasks_done_slice(s[0], s[1]), slices):
+                        for u, cnt in s_done.items():
+                            done_by_user[u] += cnt
         except Exception as e:
             print(f"Error fetching tasks done: {e}")
         return done_by_user
@@ -628,8 +696,13 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         today_str = now_local.strftime("%Y-%m-%d")
 
         def _fetch_calls_for_day(day_s, force_fresh=False):
-            if not force_fresh and day_s < today_str and day_s in _DAY_CALLS_CACHE:
-                return list(_DAY_CALLS_CACHE[day_s])
+            if not force_fresh and day_s < today_str:
+                if day_s in _DAY_CALLS_CACHE:
+                    return list(_DAY_CALLS_CACHE[day_s])
+                db_calls = db.get_cached_day_calls(day_s)
+                if db_calls is not None:
+                    _DAY_CALLS_CACHE[day_s] = list(db_calls)
+                    return list(db_calls)
 
             s_iso = f"{day_s}T00:00:00-05:00"
             e_iso = f"{day_s}T23:59:59-05:00"
@@ -659,31 +732,16 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             except Exception as e:
                 print(f"Error fetching calls for day {day_s}: {e}")
 
-            if day_s < today_str and day_calls:
+            if day_s < today_str and day_calls is not None:
                 _DAY_CALLS_CACHE[day_s] = list(day_calls)
+                db.save_cached_day_calls(day_s, day_calls)
             return day_calls
-
-        try:
-            d_start = datetime.strptime(start_date, "%Y-%m-%d").date()
-            d_end = datetime.strptime(end_date, "%Y-%m-%d").date()
-        except Exception:
-            d_start = date.today()
-            d_end = date.today()
-
-        if d_start > d_end:
-            d_start, d_end = d_end, d_start
-
-        days_list = []
-        cur_d = d_start
-        while cur_d <= d_end:
-            days_list.append(cur_d.strftime("%Y-%m-%d"))
-            cur_d += timedelta(days=1)
 
         raw_calls = []
         if len(days_list) <= 1:
-            raw_calls = _fetch_calls_for_day(days_list[0], force_fresh=force_refresh)
+            raw_calls = _fetch_calls_for_day(days_list[0] if days_list else today_str, force_fresh=force_refresh)
         else:
-            with ThreadPoolExecutor(max_workers=min(12, len(days_list))) as d_pool:
+            with ThreadPoolExecutor(max_workers=min(15, len(days_list))) as d_pool:
                 for day_calls in d_pool.map(lambda d: _fetch_calls_for_day(d, force_fresh=force_refresh), days_list):
                     raw_calls.extend(day_calls)
 
@@ -1434,12 +1492,13 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     }
 
     today_str = date.today().isoformat()
-    # Cache por 24 horas para periodos pasados historicos; 5 minutos para el rango actual
-    cache_ttl = 86400 if end_date < today_str else 300
+    # Cache por 30 dias para periodos pasados historicos; 5 minutos para el rango actual
+    cache_ttl = 86400 * 30 if end_date < today_str else 300
 
     _DASHBOARD_CACHE[cache_key] = {
         "data": result,
         "expires_at": time.time() + cache_ttl
     }
+    db.save_cached_dashboard(cache_key, result, cache_ttl)
 
     return result if include_all_commercials else _filter_dashboard_for_team(result, HERNAN_TEAM_IDS)

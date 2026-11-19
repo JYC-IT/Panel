@@ -25,7 +25,7 @@ def register_report_routes(app):
                 "last_month": {
                     "start": (today.replace(day=1) - timedelta(days=1)).replace(day=1).isoformat(),
                     "end": (today.replace(day=1) - timedelta(days=1)).isoformat(),
-                    "label": "Mes Anterior"
+                    "label": "Mes Pasado"
                 }
             }
 

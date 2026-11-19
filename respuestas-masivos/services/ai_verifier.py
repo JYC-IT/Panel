@@ -63,36 +63,43 @@ def _get_cached_verifications(activity_ids):
 
 
 def _save_verification(record):
+    _save_verifications_batch([record])
+
+
+def _save_verifications_batch(records):
+    if not records:
+        return
     try:
         with db.get_conn() as conn:
-            conn.execute(
-                """INSERT INTO ai_verifications
-                   (activity_id, activity_type, user_id, verdict, category, score, reason, evidence, summary, model_used, analyzed_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                   ON CONFLICT(activity_id) DO UPDATE SET
-                       verdict=excluded.verdict,
-                       category=excluded.category,
-                       score=excluded.score,
-                       reason=excluded.reason,
-                       evidence=excluded.evidence,
-                       summary=excluded.summary,
-                       model_used=excluded.model_used,
-                       analyzed_at=CURRENT_TIMESTAMP""",
-                (
-                    record["activity_id"],
-                    record["activity_type"],
-                    record.get("user_id", ""),
-                    record["verdict"],
-                    record.get("category", ""),
-                    int(record.get("score", 0)),
-                    record.get("reason", ""),
-                    record.get("evidence", ""),
-                    record.get("summary", ""),
-                    record.get("model_used", "Close-AI-Audit"),
-                ),
-            )
+            for record in records:
+                conn.execute(
+                    """INSERT INTO ai_verifications
+                       (activity_id, activity_type, user_id, verdict, category, score, reason, evidence, summary, model_used, analyzed_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT(activity_id) DO UPDATE SET
+                           verdict=excluded.verdict,
+                           category=excluded.category,
+                           score=excluded.score,
+                           reason=excluded.reason,
+                           evidence=excluded.evidence,
+                           summary=excluded.summary,
+                           model_used=excluded.model_used,
+                           analyzed_at=CURRENT_TIMESTAMP""",
+                    (
+                        record["activity_id"],
+                        record["activity_type"],
+                        record.get("user_id", ""),
+                        record["verdict"],
+                        record.get("category", ""),
+                        int(record.get("score", 0)),
+                        record.get("reason", ""),
+                        record.get("evidence", ""),
+                        record.get("summary", ""),
+                        record.get("model_used", "Close-AI-Audit"),
+                    ),
+                )
     except Exception as e:
-        print(f"Notice: Caching AI verification to DB bypassed: {e}")
+        print(f"Notice: Caching AI verifications batch to DB bypassed: {e}")
 
 
 def _format_utterances_dialogue(utterances, max_chars=4500):
@@ -335,13 +342,15 @@ def verify_kp_calls_batch(call_records, force=False):
         if next((int(c.get("duration") or 0) for c in call_records if c.get("id") == cid), 0) >= 10
     ][:40]
 
-    if eligible_missing:
-        with ThreadPoolExecutor(max_workers=10) as pool:
+    # Si la consulta es grande (>20 llamadas, ej. Este Mes o Mes Pasado), no saturar la red con llamadas a Close
+    if len(call_records) <= 20 and eligible_missing:
+        with ThreadPoolExecutor(max_workers=8) as pool:
             for cid, detail in pool.map(_fetch_detail, eligible_missing):
                 if detail:
                     detailed_map[cid] = detail
 
     results = []
+    new_audits = []
     gemini_budget = 10
     for base_c in call_records:
         cid = base_c.get("id")
@@ -361,7 +370,8 @@ def verify_kp_calls_batch(call_records, force=False):
             dialogue = _format_utterances_dialogue(utterances)
 
             llm_out = None
-            if gemini_client and duration >= 10 and (summary_text or dialogue) and gemini_budget > 0:
+            # Para consultas masivas (>15 KPs) priorizar analisis heuristico instantaneo sin bloquear HTTP
+            if gemini_client and len(call_records) <= 15 and duration >= 10 and (summary_text or dialogue) and gemini_budget > 0:
                 llm_out = _analyze_call_with_gemini(gemini_client, duration, note, summary_text, dialogue)
                 if llm_out:
                     llm_out["model_used"] = "Gemini-2.5-Flash"
@@ -382,7 +392,7 @@ def verify_kp_calls_batch(call_records, force=False):
                 "summary": summary_text[:600],
                 "model_used": llm_out.get("model_used", "Close-AI-Audit"),
             }
-            _save_verification(audit)
+            new_audits.append(audit)
 
         results.append({
             "id": cid,
@@ -402,6 +412,9 @@ def verify_kp_calls_batch(call_records, force=False):
             "evidence": audit.get("evidence") or "",
             "model_used": audit.get("model_used") or "Close-AI-Audit",
         })
+
+    if new_audits:
+        _save_verifications_batch(new_audits)
 
     # Order: INVALIDO first, then SOSPECHOSO, then VERIFICADO
     order_rank = {"INVALIDO": 0, "SOSPECHOSO": 1, "VERIFICADO": 2}
@@ -595,6 +608,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
     gemini_client = _get_gemini_client() if missing_records else None
 
     results = []
+    new_audits = []
     for r in tagged_records:
         aid = r["activity_id"]
         if aid in cached and not force:
@@ -603,15 +617,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
             lid = r.get("lead_id")
             ems, sms_l = lead_evidence_map.get(lid, ([], []))
             heur = _analyze_tag_heuristic(r["type"], r.get("text", ""), ems, sms_l)
-
-            llm_out = None
-            if gemini_client:
-                llm_out = _analyze_tag_with_gemini(gemini_client, r["type"], r.get("text", ""), ems, sms_l)
-                if llm_out:
-                    llm_out["model_used"] = "Gemini-2.5-Flash"
-                    llm_out["evidence"] = heur.get("evidence", "")
-
-            final = llm_out or heur
+            final = heur
             audit = {
                 "activity_id": aid,
                 "activity_type": f"tag_{r['type'].lower()}",
@@ -624,7 +630,7 @@ def verify_tagged_kps_batch(tagged_records, force=False):
                 "summary": "",
                 "model_used": final.get("model_used", "Close-AI-Audit"),
             }
-            _save_verification(audit)
+            new_audits.append(audit)
 
         results.append({
             "activity_id": aid,
@@ -642,6 +648,9 @@ def verify_tagged_kps_batch(tagged_records, force=False):
             "evidence": audit.get("evidence") or "",
             "model_used": audit.get("model_used") or "Close-AI-Audit",
         })
+
+    if new_audits:
+        _save_verifications_batch(new_audits)
 
     order_rank = {"INVALIDO": 0, "SOSPECHOSO": 1, "VERIFICADO": 2}
     results.sort(key=lambda x: (order_rank.get(x["verdict"], 9), -x["score"], x["date"]))

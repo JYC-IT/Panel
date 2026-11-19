@@ -414,6 +414,41 @@ def sync_weekly_close_kpis():
     return f"Weekly KPIs (W{week_number}): {total_calls} llamadas, {kps} KPs (4 semanas activas)"
 
 
+def sync_commercial_dashboard_cache():
+    """Precalcula y mantiene caliente en base de datos los rangos clave del panel comercial."""
+    from datetime import date, timedelta
+    from services import commercial_dashboard
+
+    today = date.today()
+    start_of_week = today - timedelta(days=today.weekday())
+    start_last_week = start_of_week - timedelta(days=7)
+    end_last_week = start_of_week - timedelta(days=1)
+    start_of_month = today.replace(day=1)
+    end_last_month = start_of_month - timedelta(days=1)
+    start_last_month = end_last_month.replace(day=1)
+
+    ranges = [
+        ("Hoy", today.isoformat(), today.isoformat()),
+        ("Esta Semana", start_of_week.isoformat(), today.isoformat()),
+        ("Semana Pasada", start_last_week.isoformat(), end_last_week.isoformat()),
+        ("Este Mes", start_of_month.isoformat(), today.isoformat()),
+        ("Mes Pasado", start_last_month.isoformat(), end_last_month.isoformat()),
+    ]
+    warmed = []
+    for label, s_d, e_d in ranges:
+        try:
+            commercial_dashboard.get_commercial_dashboard_data(
+                start_date=s_d,
+                end_date=e_d,
+                force_refresh=False,
+                include_all_commercials=True
+            )
+            warmed.append(label)
+        except Exception:
+            pass
+    return f"Dashboard comercial sincronizado ({', '.join(warmed)})"
+
+
 def run_all():
     """Ejecuta todas las fuentes. Devuelve lista de mensajes."""
     if not _lock.acquire(blocking=False):
@@ -427,6 +462,7 @@ def run_all():
             ("instantly", sync_instantly_campaigns),
             ("gmail", sync_gmail_campaigns),
             ("weekly_kpis", sync_weekly_close_kpis),
+            ("commercial_dashboard", sync_commercial_dashboard_cache),
         )
         for source, fn in sources:
             try:

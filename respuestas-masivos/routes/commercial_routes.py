@@ -38,6 +38,10 @@ def get_date_presets():
     # Este mes (Día 1 a hoy)
     start_of_month = today.replace(day=1)
 
+    # Mes pasado (Día 1 al último día del mes anterior)
+    end_last_month = start_of_month - timedelta(days=1)
+    start_last_month = end_last_month.replace(day=1)
+
     return {
         "today": {
             "start": today.isoformat(),
@@ -63,6 +67,11 @@ def get_date_presets():
             "start": start_of_month.isoformat(),
             "end": today.isoformat(),
             "label": "Este Mes"
+        },
+        "last_month": {
+            "start": start_last_month.isoformat(),
+            "end": end_last_month.isoformat(),
+            "label": "Mes Pasado"
         }
     }
 

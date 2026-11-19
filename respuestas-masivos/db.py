@@ -209,6 +209,19 @@ CREATE TABLE IF NOT EXISTS users (
     last_login    TEXT,
     created_at    TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS daily_calls_cache (
+    day TEXT PRIMARY KEY,
+    calls_json TEXT NOT NULL,
+    cached_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS dashboard_cache (
+    cache_key TEXT PRIMARY KEY,
+    data_json TEXT NOT NULL,
+    expires_at REAL NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -300,6 +313,21 @@ def init_db():
                 key TEXT PRIMARY KEY,
                 value TEXT,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS daily_calls_cache (
+                day TEXT PRIMARY KEY,
+                calls_json TEXT NOT NULL,
+                cached_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS dashboard_cache (
+                cache_key TEXT PRIMARY KEY,
+                data_json TEXT NOT NULL,
+                expires_at REAL NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
         cc_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip()
@@ -841,3 +869,81 @@ def set_setting(key: str, value: str):
                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP""",
             (key, value),
         )
+
+
+def get_cached_day_calls(day: str):
+    """Obtiene las llamadas de un día cerrado desde la base de datos persistente."""
+    if not day:
+        return None
+    try:
+        import json
+        with get_conn() as conn:
+            row = conn.execute("SELECT calls_json FROM daily_calls_cache WHERE day = ?", (day,)).fetchone()
+            if row and row["calls_json"]:
+                return json.loads(row["calls_json"])
+    except Exception:
+        pass
+    return None
+
+
+def save_cached_day_calls(day: str, calls: list):
+    """Guarda las llamadas de un día cerrado en la base de datos persistente."""
+    if not day or calls is None:
+        return
+    try:
+        import json
+        payload = json.dumps(calls, default=str)
+        with get_conn() as conn:
+            conn.execute("""
+                INSERT INTO daily_calls_cache (day, calls_json, cached_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(day) DO UPDATE SET
+                    calls_json = excluded.calls_json,
+                    cached_at = CURRENT_TIMESTAMP
+            """, (day, payload))
+    except Exception:
+        pass
+
+
+def get_cached_dashboard(cache_key: str):
+    """Obtiene el resultado precalculado del dashboard comercial desde la base de datos."""
+    if not cache_key:
+        return None
+    try:
+        import time
+        import json
+        now_ts = time.time()
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT data_json, expires_at FROM dashboard_cache WHERE cache_key = ?",
+                (cache_key,),
+            ).fetchone()
+            if row and row["expires_at"] > now_ts and row["data_json"]:
+                return json.loads(row["data_json"])
+    except Exception:
+        pass
+    return None
+
+
+def save_cached_dashboard(cache_key: str, data: dict, ttl_seconds: float):
+    """Guarda el resultado precalculado del dashboard comercial en la base de datos."""
+    if not cache_key or data is None:
+        return
+    try:
+        import time
+        import json
+        now_ts = time.time()
+        expires_at = now_ts + float(ttl_seconds)
+        payload = json.dumps(data, default=str)
+        with get_conn() as conn:
+            conn.execute("""
+                INSERT INTO dashboard_cache (cache_key, data_json, expires_at, created_at)
+                VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(cache_key) DO UPDATE SET
+                    data_json = excluded.data_json,
+                    expires_at = excluded.expires_at,
+                    created_at = CURRENT_TIMESTAMP
+            """, (cache_key, payload, expires_at))
+    except Exception:
+        pass
+
