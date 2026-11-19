@@ -683,7 +683,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         if len(days_list) <= 1:
             raw_calls = _fetch_calls_for_day(days_list[0], force_fresh=force_refresh)
         else:
-            with ThreadPoolExecutor(max_workers=min(5, len(days_list))) as d_pool:
+            with ThreadPoolExecutor(max_workers=min(12, len(days_list))) as d_pool:
                 for day_calls in d_pool.map(lambda d: _fetch_calls_for_day(d, force_fresh=force_refresh), days_list):
                     raw_calls.extend(day_calls)
 

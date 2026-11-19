@@ -329,13 +329,20 @@ def verify_kp_calls_batch(call_records, force=False):
             pass
         return cid, None
 
-    if missing_ids:
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            for cid, detail in pool.map(_fetch_detail, missing_ids):
+    # Solo solicitar grabaciones y transcripciones completas para llamadas con duracion >= 10s (hasta 40 en paralelo)
+    eligible_missing = [
+        cid for cid in missing_ids
+        if next((int(c.get("duration") or 0) for c in call_records if c.get("id") == cid), 0) >= 10
+    ][:40]
+
+    if eligible_missing:
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            for cid, detail in pool.map(_fetch_detail, eligible_missing):
                 if detail:
                     detailed_map[cid] = detail
 
     results = []
+    gemini_budget = 10
     for base_c in call_records:
         cid = base_c.get("id")
         if not cid:
@@ -354,10 +361,11 @@ def verify_kp_calls_batch(call_records, force=False):
             dialogue = _format_utterances_dialogue(utterances)
 
             llm_out = None
-            if gemini_client and duration >= 10 and (summary_text or dialogue):
+            if gemini_client and duration >= 10 and (summary_text or dialogue) and gemini_budget > 0:
                 llm_out = _analyze_call_with_gemini(gemini_client, duration, note, summary_text, dialogue)
                 if llm_out:
                     llm_out["model_used"] = "Gemini-2.5-Flash"
+                    gemini_budget -= 1
 
             if not llm_out:
                 llm_out = _analyze_call_heuristic(duration, disposition, note, rt)
