@@ -458,11 +458,11 @@ def run_all():
         # Sincronizamos primero las plataformas de envío (CC e Instantly),
         # y luego Gmail para que pueda detectar respuestas de las campañas recién actualizadas
         sources = (
+            ("commercial_dashboard", sync_commercial_dashboard_cache),
             ("constantcontact", sync_constantcontact_campaigns),
             ("instantly", sync_instantly_campaigns),
             ("gmail", sync_gmail_campaigns),
             ("weekly_kpis", sync_weekly_close_kpis),
-            ("commercial_dashboard", sync_commercial_dashboard_cache),
         )
         for source, fn in sources:
             try:

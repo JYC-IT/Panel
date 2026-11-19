@@ -505,41 +505,37 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             print(f"Error fetching opps: {e}")
         return opps_data
 
-    # --- 3. Notas con #EKP y #TKP ---
-    def _fetch_notes_slice(s_iso, e_iso):
-        slice_ekp = defaultdict(int)
-        slice_tkp = defaultdict(int)
-        slice_recs = []
+    # --- 3. Notas con #EKP y #TKP (filtradas por asesor comercial) ---
+    def _fetch_notes_for_user(uid):
+        u_ekp = 0
+        u_tkp = 0
+        u_recs = []
         skip = 0
         while True:
             r = requests.get(
                 f"{BASE_URL}/activity/note/",
                 auth=auth,
                 params={
-                    "date_created__gte": s_iso,
-                    "date_created__lte": e_iso,
+                    "user_id": uid,
+                    "date_created__gte": start_iso,
+                    "date_created__lte": end_iso,
                     "_limit": 100,
                     "_skip": skip,
                     "_fields": "id,user_id,user_name,lead_id,lead_name,note,date_created",
                 },
-                timeout=20
+                timeout=15
             )
             if r.status_code != 200:
                 break
             notes = r.json().get("data", [])
             for n in notes:
-                uid = n.get("user_id")
-                if uid not in COMMERCIAL_MAP:
-                    continue
                 text = (n.get("note") or "").strip()
                 text_lower = text.lower()
-
                 is_ekp = "#ekp" in text_lower or "ekp" in text_lower.split()
                 is_tkp = "#tkp" in text_lower or "tkp" in text_lower.split()
-
                 if is_ekp:
-                    slice_ekp[uid] += 1
-                    slice_recs.append({
+                    u_ekp += 1
+                    u_recs.append({
                         "activity_id": n.get("id"),
                         "type": "EKP",
                         "user_id": uid,
@@ -550,8 +546,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "text": text
                     })
                 if is_tkp:
-                    slice_tkp[uid] += 1
-                    slice_recs.append({
+                    u_tkp += 1
+                    u_recs.append({
                         "activity_id": n.get("id"),
                         "type": "TKP",
                         "user_id": uid,
@@ -564,7 +560,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             if not r.json().get("has_more") or len(notes) < 100:
                 break
             skip += len(notes)
-        return slice_ekp, slice_tkp, slice_recs
+        return uid, u_ekp, u_tkp, u_recs
 
     def fetch_notes_tags():
         tags_data = {
@@ -573,111 +569,88 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "records": []
         }
         try:
-            if len(days_list) <= 4:
-                ekp, tkp, recs = _fetch_notes_slice(start_iso, end_iso)
-                tags_data["ekp_by_user"] = ekp
-                tags_data["tkp_by_user"] = tkp
-                tags_data["records"] = recs
-            else:
-                chunks = [days_list[i:i + 5] for i in range(0, len(days_list), 5)]
-                slices = [(f"{c[0]}T00:00:00-05:00", f"{c[-1]}T23:59:59-05:00") for c in chunks]
-                with ThreadPoolExecutor(max_workers=min(8, len(slices))) as n_pool:
-                    for ekp, tkp, recs in n_pool.map(lambda s: _fetch_notes_slice(s[0], s[1]), slices):
-                        for u, cnt in ekp.items():
-                            tags_data["ekp_by_user"][u] += cnt
-                        for u, cnt in tkp.items():
-                            tags_data["tkp_by_user"][u] += cnt
-                        tags_data["records"].extend(recs)
+            with ThreadPoolExecutor(max_workers=min(8, len(COMMERCIAL_TEAM))) as n_pool:
+                for uid, u_ekp, u_tkp, u_recs in n_pool.map(_fetch_notes_for_user, [u["id"] for u in COMMERCIAL_TEAM]):
+                    if u_ekp:
+                        tags_data["ekp_by_user"][uid] = u_ekp
+                    if u_tkp:
+                        tags_data["tkp_by_user"][uid] = u_tkp
+                    if u_recs:
+                        tags_data["records"].extend(u_recs)
         except Exception as e:
             print(f"Error fetching notes tags: {e}")
         return tags_data
 
-    # --- 4. Tareas Set (creadas en el periodo) ---
-    def _fetch_tasks_set_slice(s_iso, e_iso):
-        slice_tasks = defaultdict(int)
+    # --- 4. Tareas Set (creadas por asesor comercial en el periodo) ---
+    def _fetch_tasks_set_for_user(uid):
+        cnt = 0
         skip = 0
         while True:
             r = requests.get(
                 f"{BASE_URL}/task/",
                 auth=auth,
                 params={
-                    "date_created__gte": s_iso,
-                    "date_created__lte": e_iso,
+                    "created_by": uid,
+                    "date_created__gte": start_iso,
+                    "date_created__lte": end_iso,
                     "_limit": 100,
                     "_skip": skip,
                     "_fields": "id,created_by",
                 },
-                timeout=20
+                timeout=15
             )
             if r.status_code != 200:
                 break
             tasks = r.json().get("data", [])
-            for t in tasks:
-                uid = t.get("created_by")
-                if uid in COMMERCIAL_MAP:
-                    slice_tasks[uid] += 1
+            cnt += len(tasks)
             if not r.json().get("has_more") or len(tasks) < 100:
                 break
             skip += len(tasks)
-        return slice_tasks
+        return uid, cnt
 
     def fetch_tasks_set():
         tasks_by_user = defaultdict(int)
         try:
-            if len(days_list) <= 5:
-                tasks_by_user = _fetch_tasks_set_slice(start_iso, end_iso)
-            else:
-                chunks = [days_list[i:i + 7] for i in range(0, len(days_list), 7)]
-                slices = [(f"{c[0]}T00:00:00-05:00", f"{c[-1]}T23:59:59-05:00") for c in chunks]
-                with ThreadPoolExecutor(max_workers=min(6, len(slices))) as ts_pool:
-                    for s_tasks in ts_pool.map(lambda s: _fetch_tasks_set_slice(s[0], s[1]), slices):
-                        for u, cnt in s_tasks.items():
-                            tasks_by_user[u] += cnt
+            with ThreadPoolExecutor(max_workers=min(8, len(COMMERCIAL_TEAM))) as ts_pool:
+                for uid, cnt in ts_pool.map(_fetch_tasks_set_for_user, [u["id"] for u in COMMERCIAL_TEAM]):
+                    tasks_by_user[uid] = cnt
         except Exception as e:
             print(f"Error fetching tasks set: {e}")
         return tasks_by_user
 
-    # --- 5. Tareas Done (completadas en el periodo) ---
-    def _fetch_tasks_done_slice(s_iso, e_iso):
-        slice_done = defaultdict(int)
+    # --- 5. Tareas Done (completadas por asesor comercial en el periodo) ---
+    def _fetch_tasks_done_for_user(uid):
+        cnt = 0
         skip = 0
         while True:
             r = requests.get(
                 f"{BASE_URL}/activity/task_completed/",
                 auth=auth,
                 params={
-                    "date_created__gte": s_iso,
-                    "date_created__lte": e_iso,
+                    "user_id": uid,
+                    "date_created__gte": start_iso,
+                    "date_created__lte": end_iso,
                     "_limit": 100,
                     "_skip": skip,
-                    "_fields": "id,user_id,created_by",
+                    "_fields": "id,user_id",
                 },
-                timeout=20
+                timeout=15
             )
             if r.status_code != 200:
                 break
             done_list = r.json().get("data", [])
-            for item in done_list:
-                uid = item.get("user_id") or item.get("created_by")
-                if uid in COMMERCIAL_MAP:
-                    slice_done[uid] += 1
+            cnt += len(done_list)
             if not r.json().get("has_more") or len(done_list) < 100:
                 break
             skip += len(done_list)
-        return slice_done
+        return uid, cnt
 
     def fetch_tasks_done():
         done_by_user = defaultdict(int)
         try:
-            if len(days_list) <= 5:
-                done_by_user = _fetch_tasks_done_slice(start_iso, end_iso)
-            else:
-                chunks = [days_list[i:i + 7] for i in range(0, len(days_list), 7)]
-                slices = [(f"{c[0]}T00:00:00-05:00", f"{c[-1]}T23:59:59-05:00") for c in chunks]
-                with ThreadPoolExecutor(max_workers=min(6, len(slices))) as td_pool:
-                    for s_done in td_pool.map(lambda s: _fetch_tasks_done_slice(s[0], s[1]), slices):
-                        for u, cnt in s_done.items():
-                            done_by_user[u] += cnt
+            with ThreadPoolExecutor(max_workers=min(8, len(COMMERCIAL_TEAM))) as td_pool:
+                for uid, cnt in td_pool.map(_fetch_tasks_done_for_user, [u["id"] for u in COMMERCIAL_TEAM]):
+                    done_by_user[uid] = cnt
         except Exception as e:
             print(f"Error fetching tasks done: {e}")
         return done_by_user

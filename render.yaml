@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: respuestas-masivos
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 2 -b 0.0.0.0:$PORT "app:create_app()"
+    startCommand: gunicorn -w 2 --timeout 120 -b 0.0.0.0:$PORT "app:create_app()"
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
