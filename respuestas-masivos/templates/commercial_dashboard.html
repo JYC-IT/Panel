@@ -1563,7 +1563,7 @@ setInterval(function() {
               </tr>
             </thead>
             <tbody>
-              {% for call in c.calls_list %}
+              {% for call in c.calls_list[:60] %}
               <tr class="agent-call-row" data-search="{{ (call.lead_name ~ ' ' ~ call.phone)|lower }}" style="border-bottom: 1px solid var(--border);">
                 <td style="padding: 7px 10px; font-weight: 600; white-space: nowrap;">{{ call.datetime }}</td>
                 <td style="padding: 7px 10px;">
@@ -1602,6 +1602,11 @@ setInterval(function() {
               {% endfor %}
             </tbody>
           </table>
+          {% if c.calls_list|length > 60 %}
+            <div style="padding: 10px 14px; background: #f8fafc; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--text-secondary); text-align: center;">
+              Mostrando las 60 llamadas más recientes en vista rápida (de {{ c.calls_list|length }} en total). Para consultar el historial completo o imprimir, abre <a href="{{ url_for('commercial_agent_report_view', user_id=c.id, start_date=data.start_date, end_date=data.end_date) }}" target="_blank" style="color: var(--brand); font-weight: 700; text-decoration: underline;">Página Completa / Imprimir</a>.
+            </div>
+          {% endif %}
         </div>
         {% else %}
           <div style="padding: 30px; text-align: center; color: var(--text-muted);">Sin llamadas registradas en este período.</div>
