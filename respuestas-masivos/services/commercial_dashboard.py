@@ -384,7 +384,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     if not start_date:
         start_date = today.isoformat()
 
-    cache_key = f"comm_dash_{start_date}_{end_date}"
+    cache_key = f"comm_dash_v3_{start_date}_{end_date}"
     now_ts = time.time()
     if not force_refresh:
         if cache_key in _DASHBOARD_CACHE:
@@ -1205,12 +1205,12 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         f_ai_calls = ai_pool.submit(
             ai_verifier.verify_kp_calls_batch,
             call_gaps.get("kp_calls", []),
-            force=False,
+            force=force_refresh,
         )
         f_ai_tags = ai_pool.submit(
             ai_verifier.verify_tagged_kps_batch,
             notes_tags.get("records", []),
-            force=False,
+            force=force_refresh,
         )
         try:
             ai_call_audits = f_ai_calls.result()

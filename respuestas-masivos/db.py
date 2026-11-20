@@ -351,6 +351,13 @@ def init_db():
         backfill_reply_intents(conn)
         _seed_weekly_kpis(conn)
 
+        # Limpieza de caches anteriores para regenerar auditorias con transcripciones completas
+        try:
+            conn.execute("DELETE FROM dashboard_cache WHERE cache_key NOT LIKE 'comm_dash_v3_%'")
+            conn.execute("DELETE FROM ai_verifications WHERE reason LIKE '%Duración insuficiente (0s)%' OR category IN ('Sin Transcripción', 'Sin Audio / Muy Corta')")
+        except Exception:
+            pass
+
 
 def deduplicate_replies(conn=None):
     """
@@ -880,7 +887,12 @@ def get_cached_day_calls(day: str):
         with get_conn() as conn:
             row = conn.execute("SELECT calls_json FROM daily_calls_cache WHERE day = ?", (day,)).fetchone()
             if row and row["calls_json"]:
-                return json.loads(row["calls_json"])
+                data = json.loads(row["calls_json"])
+                if isinstance(data, list) and len(data) > 0:
+                    # Si fue guardado con la version anterior que no incluia transcripciones, invalidar cache
+                    if "recording_transcript" not in data[0]:
+                        return None
+                return data
     except Exception:
         pass
     return None

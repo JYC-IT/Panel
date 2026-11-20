@@ -344,17 +344,24 @@ def verify_kp_calls_batch(call_records, force=False):
     ids = [c["id"] for c in call_records if c.get("id")]
     cached = {} if force else _get_cached_verifications(ids)
 
-    # Autocorrección de caché: Si una llamada estaba en caché como "Sin Transcripción" o "Sin Audio / Muy Corta"
-    # pero ahora trae transcripción o nota en base_c, invalidarla de cached para re-auditarla con los datos reales.
+    # Autocorrección de caché: Si una llamada estaba en caché con veredicto SOSPECHOSO o INVALIDO
+    # (o sin transcripción / duración 0s falsa), pero base_c tiene duración real >= 15s y cuenta con
+    # transcripción (summary_text/utterances) o nota comercial en Close CRM, invalidarla para re-auditarla.
     re_audit_ids = set()
     for base_c in call_records:
         cid = base_c.get("id")
         if cid in cached:
             aud = cached[cid]
+            dur = int(base_c.get("duration") or 0)
             rt = base_c.get("recording_transcript") or {}
             has_rt = bool((rt.get("summary_text") or "").strip() or rt.get("utterances"))
             has_note = bool((base_c.get("note") or "").strip())
-            if aud.get("category") in ("Sin Transcripción", "Sin Audio / Muy Corta") and (has_rt or has_note):
+
+            is_stale_suspicious = aud.get("category") in ("Sin Transcripción", "Sin Audio / Muy Corta")
+            is_stale_invalid = aud.get("verdict") == "INVALIDO" and (dur >= 20 or "0s" in str(aud.get("reason", "")))
+            is_stale_dialogue = aud.get("category") == "Diálogo Muy Breve" and has_rt and dur >= 60
+
+            if (is_stale_suspicious or is_stale_invalid or is_stale_dialogue) and (has_rt or has_note or dur >= 20):
                 re_audit_ids.add(cid)
     for cid in re_audit_ids:
         cached.pop(cid, None)
@@ -383,14 +390,15 @@ def verify_kp_calls_batch(call_records, force=False):
             pass
         return cid, None
 
-    # Identificar llamadas que NO traen transcripción en base_c y requieren detalle individual
+    # Identificar llamadas que NO traen transcripción ni nota en base_c y requieren detalle individual
     need_detail_ids = []
     for cid in missing_ids:
         c_obj = next((c for c in call_records if c.get("id") == cid), {})
         dur = int(c_obj.get("duration") or 0)
         rt_obj = c_obj.get("recording_transcript") or {}
         has_rt = bool((rt_obj.get("summary_text") or "").strip() or rt_obj.get("utterances"))
-        if dur >= 10 and not has_rt:
+        has_note = bool((c_obj.get("note") or "").strip())
+        if dur >= 15 and not (has_rt or has_note):
             need_detail_ids.append(cid)
 
     if need_detail_ids:
