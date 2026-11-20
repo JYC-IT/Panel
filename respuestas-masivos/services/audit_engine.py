@@ -444,5 +444,7 @@ def audit_agent_day(user_id, audit_date=None, force_refresh=False):
         "activity_log": activity_log,
         "coaching_checklist": coaching_checklist
     }
+    if len(_AUDIT_CACHE) >= 4:
+        _AUDIT_CACHE.clear()
     _AUDIT_CACHE[cache_key] = {"data": audit_result, "expires_at": time.time() + 180}
     return audit_result

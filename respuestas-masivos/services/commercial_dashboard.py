@@ -674,6 +674,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                     return list(_DAY_CALLS_CACHE[day_s])
                 db_calls = db.get_cached_day_calls(day_s)
                 if db_calls is not None:
+                    if len(_DAY_CALLS_CACHE) >= 4:
+                        _DAY_CALLS_CACHE.clear()
                     _DAY_CALLS_CACHE[day_s] = list(db_calls)
                     return list(db_calls)
 
@@ -706,6 +708,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                 print(f"Error fetching calls for day {day_s}: {e}")
 
             if day_s < today_str and day_calls is not None:
+                if len(_DAY_CALLS_CACHE) >= 4:
+                    _DAY_CALLS_CACHE.clear()
                 _DAY_CALLS_CACHE[day_s] = list(day_calls)
                 db.save_cached_day_calls(day_s, day_calls)
             return day_calls
@@ -1472,10 +1476,16 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     # Cache por 30 dias para periodos pasados historicos; 5 minutos para el rango actual
     cache_ttl = 86400 * 30 if end_date < today_str else 300
 
+    if len(_DASHBOARD_CACHE) >= 2:
+        _DASHBOARD_CACHE.clear()
     _DASHBOARD_CACHE[cache_key] = {
         "data": result,
         "expires_at": time.time() + cache_ttl
     }
     db.save_cached_dashboard(cache_key, result, cache_ttl)
+
+    # Liberar memoria de estructuras intermedias
+    import gc
+    gc.collect()
 
     return result if include_all_commercials else _filter_dashboard_for_team(result, HERNAN_TEAM_IDS)

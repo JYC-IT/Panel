@@ -245,5 +245,7 @@ def get_performance_report(start_date=None, end_date=None, force_refresh=False):
             "total_pipeline_value": total_opps_value_all
         }
     }
+    if len(_PERF_CACHE) >= 3:
+        _PERF_CACHE.clear()
     _PERF_CACHE[cache_key] = {"data": report_result, "expires_at": time.time() + 180}
     return report_result

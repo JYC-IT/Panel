@@ -402,8 +402,8 @@ def verify_kp_calls_batch(call_records, force=False):
             need_detail_ids.append(cid)
 
     if need_detail_ids:
-        with ThreadPoolExecutor(max_workers=min(10, len(need_detail_ids))) as pool:
-            for cid, detail in pool.map(_fetch_detail, need_detail_ids[:40]):
+        with ThreadPoolExecutor(max_workers=min(4, len(need_detail_ids))) as pool:
+            for cid, detail in pool.map(_fetch_detail, need_detail_ids[:20]):
                 if detail:
                     detailed_map[cid] = detail
 

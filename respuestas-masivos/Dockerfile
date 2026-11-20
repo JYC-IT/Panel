@@ -18,4 +18,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["gunicorn", "-w", "1", "--threads", "4", "--timeout", "180", "-b", "0.0.0.0:8080", "app:create_app()"]
+CMD ["gunicorn", "-w", "1", "--threads", "4", "--timeout", "180", "--max-requests", "250", "--max-requests-jitter", "25", "-b", "0.0.0.0:8080", "app:create_app()"]
