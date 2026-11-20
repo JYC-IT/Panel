@@ -24,18 +24,23 @@ def create_app():
     # Inicializar base de datos y usuario admin inicial si aplica
     db_mode = "PostgreSQL (Neon)" if db._get_database_url() else "SQLite local"
     print(f"[PanelAdmin] Base de datos activa: {db_mode}")
-    db.init_db()
-    auth.bootstrap_admin()
+    try:
+        db.init_db()
+        auth.bootstrap_admin()
+    except Exception as exc:
+        print(f"[PanelAdmin] Advertencia inicializando base de datos: {exc}")
 
     # Inicializar subsistemas
     auth.init_app(application)
     register_all_routes(application)
 
+    # Iniciar sincronizador en segundo plano (protegido con delay)
+    sync.start_scheduler()
+
     return application
 
 
 app = create_app()
-sync.start_scheduler()
 
 if __name__ == "__main__":
     import os

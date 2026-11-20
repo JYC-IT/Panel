@@ -415,24 +415,17 @@ def sync_weekly_close_kpis():
 
 
 def sync_commercial_dashboard_cache():
-    """Precalcula y mantiene caliente en base de datos los rangos clave del panel comercial."""
+    """Precalcula y mantiene caliente en base de datos los rangos activos del panel comercial."""
     from datetime import date, timedelta
     from services import commercial_dashboard
 
     today = date.today()
     start_of_week = today - timedelta(days=today.weekday())
-    start_last_week = start_of_week - timedelta(days=7)
-    end_last_week = start_of_week - timedelta(days=1)
-    start_of_month = today.replace(day=1)
-    end_last_month = start_of_month - timedelta(days=1)
-    start_last_month = end_last_month.replace(day=1)
 
+    # Solo mantenemos calientes los rangos activos para no saturar memoria en Render
     ranges = [
         ("Hoy", today.isoformat(), today.isoformat()),
         ("Esta Semana", start_of_week.isoformat(), today.isoformat()),
-        ("Semana Pasada", start_last_week.isoformat(), end_last_week.isoformat()),
-        ("Este Mes", start_of_month.isoformat(), today.isoformat()),
-        ("Mes Pasado", start_last_month.isoformat(), end_last_month.isoformat()),
     ]
     warmed = []
     for label, s_d, e_d in ranges:
@@ -497,9 +490,10 @@ def start_scheduler():
         return
     _scheduler_started = True
     stop = threading.Event()
+    delay = int(_cfg("INITIAL_SYNC_DELAY_SECONDS", "120"))
 
     def loop():
-        if stop.wait(5):  # primera sincronización poco después de arrancar
+        if stop.wait(delay):  # Esperar 2 minutos para permitir arranque y health check limpios
             return
         while True:
             run_all()
