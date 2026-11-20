@@ -8,7 +8,7 @@ from services import commercial_dashboard
 
 
 def _include_all_commercials():
-    """Admin, Juan Córdoba y Julián Prado ven todos los comerciales; lectores regulares (ej. Hernán) ven solo su equipo asignado."""
+    """Admin, Juan Córdoba, Julián Prado y Laura Herrera (Manager) ven todos los comerciales; lectores regulares ven su equipo asignado."""
     user = getattr(g, "user", None)
     if not user:
         return False
@@ -17,7 +17,8 @@ def _include_all_commercials():
     username = str(user.get("username", "")).lower()
     if username in (
         "juancordoba", "jcordoba", "juan.cordoba", "juan_cordoba",
-        "julian", "julianprado", "jprado", "julian.prado", "julian_prado", "jp"
+        "julian", "julianprado", "jprado", "julian.prado", "julian_prado", "jp",
+        "laura", "lauraherrera", "lherrera",
     ):
         return True
     return False

@@ -13,7 +13,7 @@ KP_OUTCOME_ID = "outcome_033WrVULhq3NJjJSQLPgxg"
 KP_METRIC_KEY = f"outcome.{KP_OUTCOME_ID}.count"
 CALLS_METRIC_KEY = "calls.outbound.all.count"
 
-# Asesores comerciales del equipo JYC activos (8 asesores seleccionados)
+# Asesores comerciales del equipo JYC activos (10 asesores seleccionados)
 DEFAULT_AGENT_EMAILS = [
     "hbonilla@jycexports.com",     # Hernán Bonilla
     "solutions@jycexports.com",    # Juan Abuchaibe
@@ -24,6 +24,8 @@ DEFAULT_AGENT_EMAILS = [
     "rjones@jycexports.com",       # Roy Jones
     "royjones@jycexports.com",     # Roy Jones (alias)
     "sjordan@jycmachinery.com",    # Sebastián Jordan
+    "manager@jycexports.com",      # Laura Herrera
+    "solution@jycmedical.com",     # Juliana Perez
 ]
 
 # Usuarios inactivos o no comerciales que deben excluirse de reportes

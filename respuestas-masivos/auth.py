@@ -91,8 +91,10 @@ def verify(username, password):
                   OR username = ?
                   OR (? IN ('jcordoba', 'juancordoba') AND username IN ('jcordoba', 'juancordoba'))
                   OR (? IN ('julian', 'julianprado', 'jprado', 'jp') AND username IN ('julian', 'julianprado', 'jprado', 'jp'))
-                  OR (? IN ('paula', 'pau') AND username IN ('paula', 'pau'))""",
-            (raw_user, user_handle, user_handle, user_handle, user_handle)
+                  OR (? IN ('paula', 'pau') AND username IN ('paula', 'pau'))
+                  OR (? IN ('laura', 'lauraherrera', 'lherrera') AND username IN ('laura', 'lauraherrera', 'lherrera'))
+                  OR (? IN ('juliana', 'julianaperez', 'jperez') AND username IN ('juliana', 'julianaperez', 'jperez'))""",
+            (raw_user, user_handle, user_handle, user_handle, user_handle, user_handle, user_handle)
         ).fetchone()
         if not row or not row["active"] or not check_password_hash(row["password_hash"], password or ""):
             return None
@@ -145,6 +147,22 @@ def bootstrap_admin():
             print("  Usuario lector «paula» inicializado.")
         else:
             set_password(p_row["id"], "Jyc2026*Paula")
+
+        # 6. Laura Herrera (Lector)
+        l_row = conn.execute("SELECT id FROM users WHERE username IN ('laura', 'lauraherrera', 'lherrera')").fetchone()
+        if not l_row:
+            create_user("laura", "Laura Herrera", "Jyc2026*Laura", "lector")
+            print("  Usuario lector «laura» inicializado.")
+        else:
+            set_password(l_row["id"], "Jyc2026*Laura")
+
+        # 7. Juliana Perez (Lector)
+        j_row = conn.execute("SELECT id FROM users WHERE username IN ('juliana', 'julianaperez', 'jperez')").fetchone()
+        if not j_row:
+            create_user("juliana", "Juliana Perez", "Jyc2026*Juliana", "lector")
+            print("  Usuario lector «juliana» inicializado.")
+        else:
+            set_password(j_row["id"], "Jyc2026*Juliana")
 
         # 3. Soporte opcional desde variables de entorno si se configuran
         env_user = os.getenv("ADMIN_USERNAME", "").strip()

@@ -40,15 +40,19 @@ COMMERCIAL_TEAM = [
     {"id": "user_BZhhrwAL2irTmKaPIntbraEWoINZrcYpKlGUUXsfwcV", "name": "Juan Arango", "email": "plastics@jycmachinery.com"},
     {"id": "user_piUkoIPqMs7i1Lm3vdc2c2pE3lPjU3cCRvrmvxMonGy", "name": "Julian Prado", "email": "jp@jycmedical.com"},
     {"id": "user_ESOupvkhojB5X4SkkJ20Nv05U2Klc0ImoRgS4Hwbwms", "name": "Juan Cordoba", "email": "jcordoba@jycexports.com"},
+    {"id": "user_ULEg0N4kupqyHqCSEkuQTlNynkooy2ZaFaSvPLS92sB", "name": "Laura Herrera", "email": "manager@jycexports.com"},
+    {"id": "user_Q5jZI0JEzMBhQ5jnPYGP3L26rEZkMV5plxlsQBlzloc", "name": "Juliana Perez", "email": "solution@jycmedical.com"},
 ]
 
-# Equipo visible para Hernán (sus comerciales habituales sin Sebastian Jordan)
+# Equipo visible para Hernán (sus comerciales asignados)
 HERNAN_TEAM_IDS = {
     "user_TcBTZtqa1UlOlFQyDlhLJzEywClWo3CTQwXt2OREF2e",  # Hernan Bonilla
     "user_QrLrTvgnGNQRS7AMKX2EuCFrZKvqgKmIUloYX1TkRQd",  # Mariana Polanco
     "user_fFN8XRtibi7NPtCPiZSM6Z5cHmw87PYKDJ8Xg6tYv4D",  # Roy Jones
     "user_7cXDrv9AKnoVTSOnXBJo2oYXmUrFRDG40sIYVhmDwHA",  # John Abbey
     "user_BZhhrwAL2irTmKaPIntbraEWoINZrcYpKlGUUXsfwcV",  # Juan Arango
+    "user_ULEg0N4kupqyHqCSEkuQTlNynkooy2ZaFaSvPLS92sB",  # Laura Herrera
+    "user_Q5jZI0JEzMBhQ5jnPYGP3L26rEZkMV5plxlsQBlzloc",  # Juliana Perez
 }
 
 COMMERCIAL_MAP = {u["id"]: u for u in COMMERCIAL_TEAM}
@@ -128,6 +132,24 @@ COMMERCIAL_SCHEDULES = {
     },
     "user_ESOupvkhojB5X4SkkJ20Nv05U2Klc0ImoRgS4Hwbwms": {  # Juan Cordoba
         "name": "Juan Cordoba",
+        "default": [
+            (dt_time(8, 0), dt_time(11, 50)),
+            (dt_time(13, 0), dt_time(14, 35)),
+            (dt_time(14, 45), dt_time(17, 0))
+        ],
+        "schedule_label": "8:00 AM - 5:00 PM (Alm: 11:50-1:00 | Pausa: 2:35-2:45)"
+    },
+    "user_ULEg0N4kupqyHqCSEkuQTlNynkooy2ZaFaSvPLS92sB": {  # Laura Herrera
+        "name": "Laura Herrera",
+        "default": [
+            (dt_time(8, 0), dt_time(11, 50)),
+            (dt_time(13, 0), dt_time(14, 35)),
+            (dt_time(14, 45), dt_time(17, 0))
+        ],
+        "schedule_label": "8:00 AM - 5:00 PM (Alm: 11:50-1:00 | Pausa: 2:35-2:45)"
+    },
+    "user_Q5jZI0JEzMBhQ5jnPYGP3L26rEZkMV5plxlsQBlzloc": {  # Juliana Perez
+        "name": "Juliana Perez",
         "default": [
             (dt_time(8, 0), dt_time(11, 50)),
             (dt_time(13, 0), dt_time(14, 35)),
