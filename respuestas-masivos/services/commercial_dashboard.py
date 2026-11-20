@@ -691,7 +691,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                             "date_created__lte": e_iso,
                             "_limit": 100,
                             "_skip": skip,
-                            "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted",
+                            "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted,has_recording,recording_url,disposition,note,recording_transcript",
                         },
                         timeout=25
                     )
@@ -714,7 +714,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         if len(days_list) <= 1:
             raw_calls = _fetch_calls_for_day(days_list[0] if days_list else today_str, force_fresh=force_refresh)
         else:
-            with ThreadPoolExecutor(max_workers=min(15, len(days_list))) as d_pool:
+            with ThreadPoolExecutor(max_workers=min(8, len(days_list))) as d_pool:
                 for day_calls in d_pool.map(lambda d: _fetch_calls_for_day(d, force_fresh=force_refresh), days_list):
                     raw_calls.extend(day_calls)
 
@@ -750,6 +750,10 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "is_kp": is_kp,
                         "outcome_label": "Live KP Talk" if is_kp else ("Contestada" if dur_sec > 0 else "Sin Respuesta"),
                         "close_url": f"https://app.close.com/lead/{c.get('lead_id')}/" if c.get("lead_id") else "https://app.close.com/",
+                        "note": c.get("note") or "",
+                        "disposition": c.get("disposition") or "",
+                        "has_recording": bool(c.get("recording_url") or c.get("has_recording")),
+                        "recording_transcript": c.get("recording_transcript") or {},
                         "dt_sort": dt_local,
                     })
                     user_day_calls[(uid, day_str)].append((dt_local, c))

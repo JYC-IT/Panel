@@ -195,8 +195,39 @@ def _analyze_call_heuristic(duration, disposition, note, rt):
             "model_used": "Close-AI-Audit",
         }
 
-    # 3. Sin transcripción
+    # 3. Sin transcripción (o auditar nota comercial si Notetaker no grabó audio)
     if not rt or (not summary_text and not utterances):
+        note_clean = (note or "").strip()
+        note_lower = note_clean.lower()
+        if note_clean:
+            # Si la nota misma indica buzón o no contacto
+            if any(m in note_lower for m in ("left vm", "vm left", "left voicemail", "voicemail", "buzon", "buzón", "no answer", "no contestó", "no contesto")):
+                return {
+                    "verdict": "INVALIDO",
+                    "category": "Buzón de Voz",
+                    "score": 12,
+                    "reason": f"La nota del asesor indica buzón de voz o sin respuesta: {note_clean[:120]}",
+                    "model_used": "Close-AI-Audit",
+                }
+            # Evidencia de conversación comercial en la nota
+            kp_note_markers = (
+                "tt ", "spoke with", "spoke to", "hablé con", "hable con", "hablo con", "talked to",
+                "contacto:", "contact:", "resumen", "forklift", "montacargas", "equipment", "maquinaria",
+                "c-arm", "mri", "scanner", "loader", "skid steer", "excavator", "quote", "cotizacion",
+                "cotización", "precio", "interesado", "interested", "purchasing", "vender", "comprar",
+                "no equipment", "surplus", "fleet", "renovar", "follow up", "call back"
+            )
+            has_kp_note = any(k in note_lower for k in kp_note_markers)
+            if has_kp_note and duration >= 20:
+                first_line = note_clean.splitlines()[0].strip() if note_clean.splitlines() else note_clean
+                return {
+                    "verdict": "VERIFICADO",
+                    "category": "Nota de Asesor (Sin Audio Notetaker)",
+                    "score": 85,
+                    "reason": f"Nota comercial confirma contacto con KP ({duration}s): {first_line[:140]}",
+                    "model_used": "Close-AI-Audit",
+                }
+
         if duration < 25:
             return {
                 "verdict": "INVALIDO",
@@ -279,7 +310,7 @@ def _analyze_call_heuristic(duration, disposition, note, rt):
         }
 
     # 6. Conversación real confirmada
-    if len(user_turns) >= 2 and len(contact_turns) >= 2 and (contact_talk_s >= 12.0 or has_business_hit):
+    if (len(user_turns) >= 1 and len(contact_turns) >= 1 and (contact_talk_s >= 8.0 or has_business_hit)) or (has_business_hit and (user_talk_s >= 5.0 or len(user_turns) >= 1)):
         first_bullet = ""
         if summary_text:
             clean_bullets = [b.strip("- ").strip() for b in summary_text.splitlines() if b.strip().startswith("-")]
@@ -291,7 +322,7 @@ def _analyze_call_heuristic(duration, disposition, note, rt):
         return {
             "verdict": "VERIFICADO",
             "category": "KP Real",
-            "score": 92 if has_business_hit else 80,
+            "score": 92 if has_business_hit else 82,
             "reason": reason,
             "model_used": "Close-AI-Audit",
         }
@@ -312,11 +343,27 @@ def verify_kp_calls_batch(call_records, force=False):
 
     ids = [c["id"] for c in call_records if c.get("id")]
     cached = {} if force else _get_cached_verifications(ids)
+
+    # Autocorrección de caché: Si una llamada estaba en caché como "Sin Transcripción" o "Sin Audio / Muy Corta"
+    # pero ahora trae transcripción o nota en base_c, invalidarla de cached para re-auditarla con los datos reales.
+    re_audit_ids = set()
+    for base_c in call_records:
+        cid = base_c.get("id")
+        if cid in cached:
+            aud = cached[cid]
+            rt = base_c.get("recording_transcript") or {}
+            has_rt = bool((rt.get("summary_text") or "").strip() or rt.get("utterances"))
+            has_note = bool((base_c.get("note") or "").strip())
+            if aud.get("category") in ("Sin Transcripción", "Sin Audio / Muy Corta") and (has_rt or has_note):
+                re_audit_ids.add(cid)
+    for cid in re_audit_ids:
+        cached.pop(cid, None)
+
     missing_ids = [cid for cid in ids if cid not in cached]
 
     gemini_client = _get_gemini_client() if missing_ids else None
 
-    # Fetch full details with recording_transcript for missing IDs in parallel
+    # Fetch full details with recording_transcript for missing IDs that lack transcript in base_c
     auth = close_crm._get_auth()
     detailed_map = {}
 
@@ -336,16 +383,19 @@ def verify_kp_calls_batch(call_records, force=False):
             pass
         return cid, None
 
-    # Solo solicitar grabaciones y transcripciones completas para llamadas con duracion >= 10s (hasta 40 en paralelo)
-    eligible_missing = [
-        cid for cid in missing_ids
-        if next((int(c.get("duration") or 0) for c in call_records if c.get("id") == cid), 0) >= 10
-    ][:40]
+    # Identificar llamadas que NO traen transcripción en base_c y requieren detalle individual
+    need_detail_ids = []
+    for cid in missing_ids:
+        c_obj = next((c for c in call_records if c.get("id") == cid), {})
+        dur = int(c_obj.get("duration") or 0)
+        rt_obj = c_obj.get("recording_transcript") or {}
+        has_rt = bool((rt_obj.get("summary_text") or "").strip() or rt_obj.get("utterances"))
+        if dur >= 10 and not has_rt:
+            need_detail_ids.append(cid)
 
-    # Si la consulta es grande (>20 llamadas, ej. Este Mes o Mes Pasado), no saturar la red con llamadas a Close
-    if len(call_records) <= 20 and eligible_missing:
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            for cid, detail in pool.map(_fetch_detail, eligible_missing):
+    if need_detail_ids:
+        with ThreadPoolExecutor(max_workers=min(10, len(need_detail_ids))) as pool:
+            for cid, detail in pool.map(_fetch_detail, need_detail_ids[:40]):
                 if detail:
                     detailed_map[cid] = detail
 
