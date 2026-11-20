@@ -31,22 +31,15 @@ def create_app():
     auth.init_app(application)
     register_all_routes(application)
 
-    # Iniciar sincronizador automático en segundo plano (para Gunicorn en Render y local)
-    sync.start_scheduler()
-
     return application
 
 
 app = create_app()
+sync.start_scheduler()
 
 if __name__ == "__main__":
     import os
-    db.init_db()
     is_debug = os.getenv("FLASK_DEBUG", "0") in ("1", "true", "True")
-
-    # Si el auto-recargador de Werkzeug está activo, arrancar el scheduler solo en el hilo principal de trabajo
-    if not is_debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        sync.start_scheduler()
 
     print(f"\n  Panel disponible en  http://localhost:{Config.PORT}\n")
     app.run(host=Config.HOST, port=Config.PORT, debug=is_debug, use_reloader=is_debug)

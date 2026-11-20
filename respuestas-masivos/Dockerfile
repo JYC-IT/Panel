@@ -18,4 +18,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:create_app()"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]
