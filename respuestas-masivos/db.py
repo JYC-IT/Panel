@@ -571,6 +571,42 @@ def _seed_weekly_kpis(conn):
         WHERE week_number = 28 AND (outreach_emails_cc = 0 OR outreach_emails_cc IS NULL)
     """)
 
+    # Campañas verificadas de la Semana 29 (16 al 22 de Noviembre de 2026)
+    w29_campaigns = [
+        ("JYC Machinery: Engel Duo 3", "constantcontact", "JYC Machinery: Engel Duo 3", "hbonilla@jycexports.com", "cc_manual_engel_duo_3_20261116", 34057, 6027, 2342, 1682, "2026-11-16"),
+        ("JYC Ports Latam: 2026/11/17 - VENTA - Grúas Móviles Portuarias", "constantcontact", "JYC Ports Latam: 2026/11/17 - VENTA - Grúas Móviles Portuarias", "hbonilla@jycexports.com", "cc_manual_gruas_moviles_20261117", 1552, 474, 25, 282, "2026-11-17"),
+        ("JYC Ports: 2026/11/17 - SELL - Mobile Harbor Cranes", "constantcontact", "Late model Empty container handlers available", "hbonilla@jycexports.com", "a4da37bd-3140-4f8d-a5b6-d9fae9d57113", 3218, 905, 58, 221, "2026-11-17"),
+        ("JYC Wholesale: 2026/11/17 - SELL - Dealers", "constantcontact", "JYC Wholesale: 2026/11/17 - SELL - Dealers", "hbonilla@jycexports.com", "cc_manual_wholesale_dealers_20261117", 2336, 897, 0, 188, "2026-11-17"),
+        ("JYC MEDICAL: 2026-11-19 - BUY - Dealers (X-Ray)", "constantcontact", "JYC MEDICAL: 2026-11-19 - BUY - Dealers (X-Ray)", "jp@jycmedical.com", "cc_manual_medical_xray_20261119", 398, 167, 8, 15, "2026-11-19"),
+    ]
+    for c_name, c_src, c_subj, c_rep, c_ext, c_sent, c_open, c_click, c_bounce, c_date in w29_campaigns:
+        conn.execute(
+            """INSERT INTO campaigns (name, source, match_subject, reply_to_email, external_id, sent_count, opens_count, clicks_count, bounces_count, start_date)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(external_id) DO UPDATE SET
+                   name=excluded.name,
+                   match_subject=excluded.match_subject,
+                   reply_to_email=excluded.reply_to_email,
+                   sent_count=excluded.sent_count,
+                   opens_count=excluded.opens_count,
+                   clicks_count=excluded.clicks_count,
+                   bounces_count=excluded.bounces_count,
+                   start_date=excluded.start_date""",
+            (c_name, c_src, c_subj, c_rep, c_ext, c_sent, c_open, c_click, c_bounce, c_date),
+        )
+
+    # Asegurar que la Semana 29 tenga los totales exactos de masivos consolidados
+    conn.execute("""
+        UPDATE weekly_team_kpis
+        SET outreach_emails_cc = 41561,
+            outreach_emails_instantly = 206,
+            total_outreach = 41767,
+            opens_count = 8543,
+            clicks_count = 2449,
+            click_rate = 5.86
+        WHERE week_number = 29 AND (outreach_emails_cc = 0 OR outreach_emails_cc IS NULL OR outreach_emails_cc < 41561)
+    """)
+
     w27_agents = [
         (27, "user_7cXDrv9AKnoVTSOnXBJo2oYXmUrFRDG40sIYVhmDwHA", "Juan Abuchaibe", 149, 8, 5.37),
         (27, "user_QrLrTvgnGNQRS7AMKX2EuCFrZKvqgKmIUloYX1TkRQd", "Mariana Polanco", 128, 15, 11.72),
