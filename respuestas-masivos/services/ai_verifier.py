@@ -171,12 +171,20 @@ def _analyze_call_heuristic(duration, disposition, note, rt):
     note_lower = (note or "").lower()
 
     # 1. Llamadas vacías o ultracortas (< 10s)
-    if duration < 10 or disposition in ("no-answer", "busy", "failed", "canceled"):
+    if duration < 10:
         return {
             "verdict": "INVALIDO",
             "category": "Llamada Corta / Sin Diálogo",
             "score": 5,
-            "reason": f"Duración insuficiente ({duration}s) o sin conexión; no pudo existir diálogo real con un KP.",
+            "reason": f"Duración insuficiente ({duration}s); no pudo existir diálogo real con un KP.",
+            "model_used": "Close-AI-Audit",
+        }
+    if duration < 25 and disposition in ("no-answer", "busy", "failed", "canceled"):
+        return {
+            "verdict": "INVALIDO",
+            "category": "Sin Conexión",
+            "score": 5,
+            "reason": f"Llamada sin conexión o no contestada ({duration}s, estado: {disposition}).",
             "model_used": "Close-AI-Audit",
         }
 
@@ -211,11 +219,13 @@ def _analyze_call_heuristic(duration, disposition, note, rt):
                 }
             # Evidencia de conversación comercial en la nota
             kp_note_markers = (
-                "tt ", "spoke with", "spoke to", "hablé con", "hable con", "hablo con", "talked to",
+                "tt ", "tt.", "tt:", "spoke with", "spoke to", "hablé con", "hable con", "hablo con", "talked to",
                 "contacto:", "contact:", "resumen", "forklift", "montacargas", "equipment", "maquinaria",
                 "c-arm", "mri", "scanner", "loader", "skid steer", "excavator", "quote", "cotizacion",
                 "cotización", "precio", "interesado", "interested", "purchasing", "vender", "comprar",
-                "no equipment", "surplus", "fleet", "renovar", "follow up", "call back"
+                "no equipment", "surplus", "fleet", "renovar", "follow up", "call back",
+                "reachstacker", "toppick", "konecranes", "hyster", "taylor", "kalmar", "sany", "pressure vessel",
+                "rich stacker", "container handler", "fork test"
             )
             has_kp_note = any(k in note_lower for k in kp_note_markers)
             if has_kp_note and duration >= 20:
@@ -357,11 +367,11 @@ def verify_kp_calls_batch(call_records, force=False):
             has_rt = bool((rt.get("summary_text") or "").strip() or rt.get("utterances"))
             has_note = bool((base_c.get("note") or "").strip())
 
-            is_stale_suspicious = aud.get("category") in ("Sin Transcripción", "Sin Audio / Muy Corta")
-            is_stale_invalid = aud.get("verdict") == "INVALIDO" and (dur >= 20 or "0s" in str(aud.get("reason", "")))
-            is_stale_dialogue = aud.get("category") == "Diálogo Muy Breve" and has_rt and dur >= 60
+            is_stale_suspicious = aud.get("category") in ("Sin Transcripción", "Sin Audio / Muy Corta") and (dur >= 20 or has_note)
+            is_stale_invalid = aud.get("verdict") == "INVALIDO" and (dur >= 15 or "0s" in str(aud.get("reason", "")))
+            is_stale_dialogue = aud.get("category") == "Diálogo Muy Breve" and dur >= 60
 
-            if (is_stale_suspicious or is_stale_invalid or is_stale_dialogue) and (has_rt or has_note or dur >= 20):
+            if is_stale_suspicious or is_stale_invalid or is_stale_dialogue:
                 re_audit_ids.add(cid)
     for cid in re_audit_ids:
         cached.pop(cid, None)
@@ -390,20 +400,19 @@ def verify_kp_calls_batch(call_records, force=False):
             pass
         return cid, None
 
-    # Identificar llamadas que NO traen transcripción ni nota en base_c y requieren detalle individual
+    # Identificar llamadas que NO traen transcripción en base_c y requieren detalle individual
     need_detail_ids = []
     for cid in missing_ids:
         c_obj = next((c for c in call_records if c.get("id") == cid), {})
         dur = int(c_obj.get("duration") or 0)
         rt_obj = c_obj.get("recording_transcript") or {}
         has_rt = bool((rt_obj.get("summary_text") or "").strip() or rt_obj.get("utterances"))
-        has_note = bool((c_obj.get("note") or "").strip())
-        if dur >= 15 and not (has_rt or has_note):
+        if dur >= 15 and not has_rt:
             need_detail_ids.append(cid)
 
     if need_detail_ids:
-        with ThreadPoolExecutor(max_workers=min(4, len(need_detail_ids))) as pool:
-            for cid, detail in pool.map(_fetch_detail, need_detail_ids[:20]):
+        with ThreadPoolExecutor(max_workers=min(6, len(need_detail_ids))) as pool:
+            for cid, detail in pool.map(_fetch_detail, need_detail_ids):
                 if detail:
                     detailed_map[cid] = detail
 
@@ -415,14 +424,15 @@ def verify_kp_calls_batch(call_records, force=False):
         if not cid:
             continue
 
+        c = detailed_map.get(cid) or base_c
+        duration = int(c.get("duration") or base_c.get("duration") or 0)
+        disposition = c.get("disposition") or base_c.get("disposition") or ""
+        note = c.get("note") or base_c.get("note") or ""
+        rt = c.get("recording_transcript") or base_c.get("recording_transcript") or {}
+
         if cid in cached and not force:
             audit = cached[cid]
         else:
-            c = detailed_map.get(cid) or base_c
-            duration = int(c.get("duration") or 0)
-            disposition = c.get("disposition") or ""
-            note = c.get("note") or ""
-            rt = c.get("recording_transcript") or {}
             summary_text = (rt.get("summary_text") or "").strip()
             utterances = rt.get("utterances") or []
             dialogue = _format_utterances_dialogue(utterances)
@@ -452,6 +462,7 @@ def verify_kp_calls_batch(call_records, force=False):
             }
             new_audits.append(audit)
 
+        actual_dur = duration if (cid not in cached or force) else int(base_c.get("duration") or 0)
         results.append({
             "id": cid,
             "user_id": base_c.get("user_id"),
@@ -459,9 +470,9 @@ def verify_kp_calls_batch(call_records, force=False):
             "lead_id": base_c.get("lead_id"),
             "lead_name": base_c.get("lead_name") or base_c.get("lead_id") or "Sin Lead",
             "date": _format_local_dt(base_c.get("date_created")),
-            "duration": int(base_c.get("duration") or 0),
+            "duration": actual_dur,
             "direction": base_c.get("direction") or "outbound",
-            "has_recording": bool(base_c.get("recording_url") or base_c.get("has_recording")),
+            "has_recording": bool(c.get("recording_url") or c.get("has_recording") or base_c.get("recording_url") or base_c.get("has_recording")),
             "verdict": audit["verdict"],
             "category": audit["category"],
             "score": audit["score"],

@@ -5,5 +5,5 @@ workers = 1
 threads = 4
 timeout = 180
 keepalive = 5
-max_requests = 250
-max_requests_jitter = 25
+max_requests = 50
+max_requests_jitter = 10

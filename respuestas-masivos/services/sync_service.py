@@ -48,7 +48,11 @@ def _get_workspace_users():
     except Exception:
         pass
 
-    return sorted(list(users))
+    # Excluir cuentas inactivas o de prueba que fallan en la delegación de Google Workspace
+    excluded = {"rvelez@jycmedical.com", "test@jycexports.com", "ccordoba@equipmentjyc.com"}
+    filtered_users = [u for u in users if u not in excluded and not u.startswith("test@")]
+
+    return sorted(filtered_users)
 
 
 def _get_mailboxes():
@@ -460,7 +464,8 @@ def run_all():
         for source, fn in sources:
             try:
                 msg = fn()
-                db.log_sync(source, True, msg)
+                is_ok = "ERROR" not in msg and "error" not in msg.lower()
+                db.log_sync(source, is_ok, msg)
             except Exception as exc:  # noqa: BLE001 - se registra cualquier error de la fuente
                 msg = f"{source}: ERROR - {exc}"
                 db.log_sync(source, False, msg)

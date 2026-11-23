@@ -86,8 +86,25 @@ def register_campaign_routes(app):
             "unique": total_unique,
         }
         totals["rate"] = _rate(sum(r["responders"] for r in rows), totals["sent"])
-        return render_template("index.html", campaigns=rows, totals=totals, last_syncs=last_syncs,
-                               advisors=advisors, active_page="campaigns", interval=Config.SYNC_INTERVAL_MINUTES)
+        cc_needs_reconnect = any(
+            str(s.get("source")).lower() == "constantcontact" and (
+                not s.get("ok")
+                or "error" in str(s.get("message", "")).lower()
+                or "401" in str(s.get("message", ""))
+                or "unauthorized" in str(s.get("message", "")).lower()
+            )
+            for s in last_syncs
+        )
+        return render_template(
+            "index.html",
+            campaigns=rows,
+            totals=totals,
+            last_syncs=last_syncs,
+            advisors=advisors,
+            active_page="campaigns",
+            interval=Config.SYNC_INTERVAL_MINUTES,
+            cc_needs_reconnect=cc_needs_reconnect,
+        )
 
     @app.post("/campaign/create")
     @app.post("/campaigns")
@@ -234,7 +251,7 @@ def register_campaign_routes(app):
                         headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
     @app.route("/connect-cc")
-    @auth.admin_required
+    @auth.login_required
     def connect_constant_contact():
         from urllib.parse import quote
         client_id = os.getenv("CONSTANT_CONTACT_CLIENT_ID", "").strip() or Config.CONSTANT_CONTACT_CLIENT_ID or db.get_setting("cc_client_id", "").strip()
@@ -302,19 +319,14 @@ def register_campaign_routes(app):
                     force_refresh=True,
                     include_all_commercials=True
                 )
-                flash(" Metricas comerciales de Close CRM sincronizadas en vivo.", "ok")
+                flash("Metricas comerciales de Close CRM sincronizadas en vivo.", "ok")
             except Exception as e:
                 flash(f"Error sincronizando metricas comerciales: {e}", "error")
             return redirect(target_url)
 
-        # Sincronizacion general de campanas Constant Contact (solo admin)
-        user = getattr(g, "user", None)
-        if not user or user.get("role") != "admin":
-            flash("La sincronizacion de campanas masivas es solo para administradores.", "error")
-            return redirect(target_url)
-
+        # Sincronizacion de campanas masivas (Constant Contact, Instantly, Gmail, Google Workspace)
         import threading
         threading.Thread(target=sync.run_all, daemon=True).start()
-        flash(" Sincronizacion de campanas y respuestas iniciada en segundo plano.", "ok")
+        flash("Sincronizacion de campanas y respuestas iniciada en segundo plano.", "ok")
         return redirect(target_url)
 

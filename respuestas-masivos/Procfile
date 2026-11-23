@@ -1,1 +1,1 @@
-web: gunicorn -w 1 --threads 4 --timeout 180 --max-requests 250 --max-requests-jitter 25 -b 0.0.0.0:$PORT "app:create_app()"
+web: gunicorn -w 1 --threads 4 --timeout 180 --max-requests 50 --max-requests-jitter 10 -b 0.0.0.0:$PORT "app:create_app()"

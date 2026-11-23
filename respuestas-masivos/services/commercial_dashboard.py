@@ -715,7 +715,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                             "date_created__lte": e_iso,
                             "_limit": 100,
                             "_skip": skip,
-                            "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted,has_recording,recording_url,disposition,note,recording_transcript",
+                            "_fields": "id,user_id,user_name,lead_id,lead_name,date_created,outcome_id,duration,direction,remote_phone,remote_phone_formatted,has_recording,recording_url,disposition,note",
                         },
                         timeout=25
                     )
@@ -776,10 +776,6 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                         "is_kp": is_kp,
                         "outcome_label": "Live KP Talk" if is_kp else ("Contestada" if dur_sec > 0 else "Sin Respuesta"),
                         "close_url": f"https://app.close.com/lead/{c.get('lead_id')}/" if c.get("lead_id") else "https://app.close.com/",
-                        "note": c.get("note") or "",
-                        "disposition": c.get("disposition") or "",
-                        "has_recording": bool(c.get("recording_url") or c.get("has_recording")),
-                        "recording_transcript": c.get("recording_transcript") or {},
                         "dt_sort": dt_local,
                     })
                     user_day_calls[(uid, day_str)].append((dt_local, c))
@@ -1416,7 +1412,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "status_goal": status_goal,
             "status_class": status_class,
             # Detalle individual completo para el reporte interactivo del asesor
-            "calls_list": call_gaps.get("calls_by_user", {}).get(uid, []),
+            "calls_list": call_gaps.get("calls_by_user", {}).get(uid, [])[:120],
             "kp_calls_list": [a for a in ai_call_audits if a.get("user_id") == uid],
             "kp_tags_list": [t for t in ai_tag_audits if t.get("user_id") == uid],
             "opportunities": [op for op in opps_data.get("list", []) if op.get("user_id") == uid],

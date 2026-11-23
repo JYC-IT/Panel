@@ -353,8 +353,8 @@ def init_db():
 
         # Limpieza de caches anteriores para regenerar auditorias con transcripciones completas
         try:
-            conn.execute("DELETE FROM dashboard_cache WHERE cache_key NOT LIKE 'comm_dash_v3_%'")
-            conn.execute("DELETE FROM ai_verifications WHERE reason LIKE '%Duración insuficiente (0s)%' OR category IN ('Sin Transcripción', 'Sin Audio / Muy Corta')")
+            conn.execute("DELETE FROM dashboard_cache")
+            conn.execute("DELETE FROM ai_verifications WHERE reason LIKE '%Duración insuficiente%' OR category IN ('Sin Transcripción', 'Sin Audio / Muy Corta')")
         except Exception:
             pass
 
@@ -889,8 +889,12 @@ def get_cached_day_calls(day: str):
             if row and row["calls_json"]:
                 data = json.loads(row["calls_json"])
                 if isinstance(data, list) and len(data) > 0:
-                    # Si fue guardado con la version anterior que no incluia transcripciones, invalidar cache
-                    if "recording_transcript" not in data[0]:
+                    # Invalida cache si contiene llamadas KP con duracion 0 (guardadas cuando estaban en curso)
+                    has_zero_kp = any(
+                        c.get("outcome_id") == "outcome_033WrVULhq3NJjJSQLPgxg" and int(c.get("duration") or 0) == 0
+                        for c in data
+                    )
+                    if has_zero_kp:
                         return None
                 return data
     except Exception:
