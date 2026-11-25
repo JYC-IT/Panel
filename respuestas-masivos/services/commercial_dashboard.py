@@ -649,7 +649,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "records": []
         }
         try:
-            with ThreadPoolExecutor(max_workers=min(8, len(COMMERCIAL_TEAM))) as n_pool:
+            with ThreadPoolExecutor(max_workers=4) as n_pool:
                 for uid, u_ekp, u_tkp, u_recs in n_pool.map(_fetch_notes_for_user, [u["id"] for u in COMMERCIAL_TEAM]):
                     if u_ekp:
                         tags_data["ekp_by_user"][uid] = u_ekp
@@ -661,11 +661,9 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             print(f"Error fetching notes tags: {e}")
         return tags_data
 
-    # --- 4. Tareas Set (creadas por asesor comercial en el periodo) ---
+    # --- 4. Tareas Set (creadas por asesor comercial en el periodo, en 1 sola petición vía total_results) ---
     def _fetch_tasks_set_for_user(uid):
-        cnt = 0
-        skip = 0
-        while True:
+        try:
             r = requests.get(
                 f"{BASE_URL}/task/",
                 auth=auth,
@@ -673,62 +671,61 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                     "created_by": uid,
                     "date_created__gte": start_iso,
                     "date_created__lte": end_iso,
-                    "_limit": 100,
-                    "_skip": skip,
-                    "_fields": "id,created_by",
+                    "_limit": 1,
+                    "_fields": "id",
                 },
-                timeout=15
+                timeout=12
             )
-            if r.status_code != 200:
-                break
-            tasks = r.json().get("data", [])
-            cnt += len(tasks)
-            if not r.json().get("has_more") or len(tasks) < 100:
-                break
-            skip += len(tasks)
-        return uid, cnt
+            if r.status_code == 200:
+                body = r.json()
+                tot = body.get("total_results")
+                if tot is not None:
+                    return uid, int(tot)
+                return uid, len(body.get("data", []))
+        except Exception:
+            pass
+        return uid, 0
 
     def fetch_tasks_set():
         tasks_by_user = defaultdict(int)
         try:
-            with ThreadPoolExecutor(max_workers=min(8, len(COMMERCIAL_TEAM))) as ts_pool:
+            with ThreadPoolExecutor(max_workers=4) as ts_pool:
                 for uid, cnt in ts_pool.map(_fetch_tasks_set_for_user, [u["id"] for u in COMMERCIAL_TEAM]):
                     tasks_by_user[uid] = cnt
         except Exception as e:
             print(f"Error fetching tasks set: {e}")
         return tasks_by_user
 
-    # --- 5. Tareas Done (completadas por asesor comercial en el periodo) ---
+    # --- 5. Tareas Done (completadas por asesor comercial en el periodo, en 1 sola petición vía total_results) ---
     def _fetch_tasks_done_for_user(uid):
-        cnt = 0
-        skip = 0
-        while True:
+        try:
             r = requests.get(
-                f"{BASE_URL}/activity/task_completed/",
+                f"{BASE_URL}/task/",
                 auth=auth,
                 params={
-                    "user_id": uid,
-                    "date_created__gte": start_iso,
-                    "date_created__lte": end_iso,
-                    "_limit": 100,
-                    "_skip": skip,
-                    "_fields": "id,user_id",
+                    "assigned_to": uid,
+                    "is_complete": "true",
+                    "date_updated__gte": start_iso,
+                    "date_updated__lte": end_iso,
+                    "_limit": 1,
+                    "_fields": "id",
                 },
-                timeout=15
+                timeout=12
             )
-            if r.status_code != 200:
-                break
-            done_list = r.json().get("data", [])
-            cnt += len(done_list)
-            if not r.json().get("has_more") or len(done_list) < 100:
-                break
-            skip += len(done_list)
-        return uid, cnt
+            if r.status_code == 200:
+                body = r.json()
+                tot = body.get("total_results")
+                if tot is not None:
+                    return uid, int(tot)
+                return uid, len(body.get("data", []))
+        except Exception:
+            pass
+        return uid, 0
 
     def fetch_tasks_done():
         done_by_user = defaultdict(int)
         try:
-            with ThreadPoolExecutor(max_workers=min(8, len(COMMERCIAL_TEAM))) as td_pool:
+            with ThreadPoolExecutor(max_workers=4) as td_pool:
                 for uid, cnt in td_pool.map(_fetch_tasks_done_for_user, [u["id"] for u in COMMERCIAL_TEAM]):
                     done_by_user[uid] = cnt
         except Exception as e:

@@ -351,13 +351,6 @@ def init_db():
         backfill_reply_intents(conn)
         _seed_weekly_kpis(conn)
 
-        # Limpieza de caches anteriores para regenerar auditorias con transcripciones completas
-        try:
-            conn.execute("DELETE FROM dashboard_cache")
-            conn.execute("DELETE FROM ai_verifications WHERE reason LIKE '%Duración insuficiente%' OR category IN ('Sin Transcripción', 'Sin Audio / Muy Corta')")
-        except Exception:
-            pass
-
 
 def deduplicate_replies(conn=None):
     """

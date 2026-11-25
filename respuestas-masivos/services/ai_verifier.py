@@ -354,24 +354,22 @@ def verify_kp_calls_batch(call_records, force=False):
     ids = [c["id"] for c in call_records if c.get("id")]
     cached = {} if force else _get_cached_verifications(ids)
 
-    # Autocorrección de caché: Si una llamada estaba en caché con veredicto SOSPECHOSO o INVALIDO
-    # (o sin transcripción / duración 0s falsa), pero base_c tiene duración real >= 15s y cuenta con
-    # transcripción (summary_text/utterances) o nota comercial en Close CRM, invalidarla para re-auditarla.
+    # Autocorrección de caché: Si una llamada estaba en caché con duración 0s falsa
+    # o con nota comercial disponible sin auditar, invalidarla (máx. 15 por petición).
     re_audit_ids = set()
     for base_c in call_records:
+        if len(re_audit_ids) >= 15:
+            break
         cid = base_c.get("id")
         if cid in cached:
             aud = cached[cid]
             dur = int(base_c.get("duration") or 0)
-            rt = base_c.get("recording_transcript") or {}
-            has_rt = bool((rt.get("summary_text") or "").strip() or rt.get("utterances"))
             has_note = bool((base_c.get("note") or "").strip())
 
-            is_stale_suspicious = aud.get("category") in ("Sin Transcripción", "Sin Audio / Muy Corta") and (dur >= 20 or has_note)
-            is_stale_invalid = aud.get("verdict") == "INVALIDO" and (dur >= 15 or "0s" in str(aud.get("reason", "")))
-            is_stale_dialogue = aud.get("category") == "Diálogo Muy Breve" and dur >= 60
+            is_stale_zero = aud.get("verdict") == "INVALIDO" and dur >= 15 and "0s" in str(aud.get("reason", ""))
+            is_stale_note = aud.get("category") in ("Sin Transcripción", "Sin Audio / Muy Corta") and has_note and dur >= 20
 
-            if is_stale_suspicious or is_stale_invalid or is_stale_dialogue:
+            if is_stale_zero or is_stale_note:
                 re_audit_ids.add(cid)
     for cid in re_audit_ids:
         cached.pop(cid, None)
@@ -389,7 +387,7 @@ def verify_kp_calls_batch(call_records, force=False):
 
     missing_ids = [cid for cid in ids if cid not in cached]
 
-    gemini_client = _get_gemini_client() if missing_ids else None
+    gemini_client = _get_gemini_client() if (missing_ids and len(call_records) <= 15) else None
 
     # Fetch full details with recording_transcript for missing IDs that lack transcript in base_c
     auth = close_crm._get_auth()
@@ -403,7 +401,7 @@ def verify_kp_calls_batch(call_records, force=False):
                 f"{BASE_URL}/activity/call/{cid}/",
                 auth=auth,
                 params={"_fields": "id,user_id,lead_id,duration,direction,disposition,note,date_created,recording_url,recording_transcript"},
-                timeout=15,
+                timeout=8,
             )
             if r.status_code == 200:
                 return cid, r.json()
@@ -411,15 +409,21 @@ def verify_kp_calls_batch(call_records, force=False):
             pass
         return cid, None
 
-    # Identificar llamadas que NO traen transcripción en base_c y requieren detalle individual
-    need_detail_ids = []
+    # Identificar llamadas que NO traen transcripción en base_c y requieren detalle individual.
+    # Tope de 25 llamadas más recientes por petición para evitar timeouts / 429 en reportes mensuales.
+    records_by_id = {c["id"]: c for c in call_records if c.get("id")}
+    need_detail_candidates = []
     for cid in missing_ids:
-        c_obj = next((c for c in call_records if c.get("id") == cid), {})
+        c_obj = records_by_id.get(cid, {})
         dur = int(c_obj.get("duration") or 0)
         rt_obj = c_obj.get("recording_transcript") or {}
         has_rt = bool((rt_obj.get("summary_text") or "").strip() or rt_obj.get("utterances"))
         if dur >= 15 and not has_rt:
-            need_detail_ids.append(cid)
+            need_detail_candidates.append((c_obj.get("date_created") or "", cid))
+
+    need_detail_candidates.sort(key=lambda x: x[0], reverse=True)
+    need_detail_ids = [cid for _, cid in need_detail_candidates[:25]]
+    fetched_detail_set = set(need_detail_ids)
 
     if need_detail_ids:
         with ThreadPoolExecutor(max_workers=min(6, len(need_detail_ids))) as pool:
@@ -471,7 +475,9 @@ def verify_kp_calls_batch(call_records, force=False):
                 "summary": summary_text[:600],
                 "model_used": llm_out.get("model_used", "Close-AI-Audit"),
             }
-            new_audits.append(audit)
+            # Solo persistir en caché si fue verificada/auditada con detalle o no requiere detalle externo
+            if cid in fetched_detail_set or audit["category"] != "Sin Transcripción":
+                new_audits.append(audit)
 
         actual_dur = duration if (cid not in cached or force) else int(base_c.get("duration") or 0)
         results.append({
