@@ -464,7 +464,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     if not start_date:
         start_date = today.isoformat()
 
-    cache_key = f"comm_dash_v3_{start_date}_{end_date}"
+    cache_key = f"comm_dash_v4_{start_date}_{end_date}"
     now_ts = time.time()
     if not force_refresh:
         if cache_key in _DASHBOARD_CACHE:
@@ -1240,6 +1240,65 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         tasks_done = f_tdone.result()
         call_gaps = f_gaps.result()
 
+    local_tz = timezone(timedelta(hours=-5))
+
+    # Regla de negocio: Máximo 1 KP por día por Lead (sin importar cuántos KPs realice
+    # el asesor en ese mismo lead el mismo día). Prioridad: Live KP (llamada más larga) > #EKP > #TKP.
+    def _local_day_str(raw_dt):
+        try:
+            clean = (raw_dt or "").replace("Z", "+00:00")
+            return datetime.fromisoformat(clean).astimezone(local_tz).strftime("%Y-%m-%d")
+        except Exception:
+            return (raw_dt or "")[:10]
+
+    claimed_user_day_lead = set()
+    live_kp_by_user_day = defaultdict(int)
+    live_kp_by_user = defaultdict(int)
+
+    raw_kp_calls = sorted(
+        call_gaps.get("kp_calls", []),
+        key=lambda x: (int(x.get("duration") or 0), x.get("date_created") or ""),
+        reverse=True,
+    )
+    dedup_kp_calls = []
+    for c in raw_kp_calls:
+        uid = c.get("user_id")
+        day_s = _local_day_str(c.get("date_created"))
+        lead_key = c.get("lead_id") or c.get("id")
+        dedup_key = (uid, day_s, lead_key)
+        if dedup_key in claimed_user_day_lead:
+            continue
+        claimed_user_day_lead.add(dedup_key)
+        dedup_kp_calls.append(c)
+        live_kp_by_user_day[(uid, day_s)] += 1
+        live_kp_by_user[uid] += 1
+    call_gaps["kp_calls"] = dedup_kp_calls
+
+    raw_tag_recs = sorted(
+        notes_tags.get("records", []),
+        key=lambda x: (0 if (x.get("type") or "").upper() == "EKP" else 1, x.get("date") or ""),
+    )
+    dedup_tag_recs = []
+    dedup_ekp_by_user = defaultdict(int)
+    dedup_tkp_by_user = defaultdict(int)
+    for rec in raw_tag_recs:
+        uid = rec.get("user_id")
+        day_s = _local_day_str(rec.get("date"))
+        lead_key = rec.get("lead_id") or rec.get("activity_id")
+        dedup_key = (uid, day_s, lead_key)
+        if dedup_key in claimed_user_day_lead:
+            continue
+        claimed_user_day_lead.add(dedup_key)
+        dedup_tag_recs.append(rec)
+        t = (rec.get("type") or "").upper()
+        if t == "EKP":
+            dedup_ekp_by_user[uid] += 1
+        elif t == "TKP":
+            dedup_tkp_by_user[uid] += 1
+    notes_tags["records"] = dedup_tag_recs
+    notes_tags["ekp_by_user"] = dedup_ekp_by_user
+    notes_tags["tkp_by_user"] = dedup_tkp_by_user
+
     # Resolver nombres de leads priorizando llamadas KP y notas #EKP/#TKP primero
     needed_lead_ids = []
     for c in call_gaps.get("kp_calls", []):
@@ -1384,7 +1443,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         dur_total_sec = dur_out + dur_in
         dur_info = format_duration(dur_total_sec)
 
-        live_kp = uact.get(KP_METRIC_KEY, 0) or 0
+        live_kp = live_kp_by_user[uid]
         ekp = notes_tags["ekp_by_user"][uid]
         tkp = notes_tags["tkp_by_user"][uid]
         all_kps = live_kp + ekp + tkp
@@ -1429,7 +1488,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             c_in_d = sum(1 for _, c in ucalls_day if c.get("direction") == "inbound")
             c_tot_d = len(ucalls_day)
             dur_s_d = sum(int(c.get("duration") or 0) for _, c in ucalls_day)
-            l_kp_d = sum(1 for _, c in ucalls_day if c.get("outcome_id") == KP_OUTCOME_ID)
+            l_kp_d = live_kp_by_user_day[(uid, day_s)]
 
             t_data_d = tags_by_user_day.get((uid, day_s), {"ekp": 0, "tkp": 0, "total": 0})
             ekp_d = t_data_d["ekp"]
