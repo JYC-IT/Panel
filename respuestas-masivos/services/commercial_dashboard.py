@@ -349,7 +349,56 @@ def _filter_dashboard_for_team(result, allowed_user_ids):
         "total_live_kp_verified": sum(1 for a in ai_calls if a.get("verdict") == "VERIFICADO"),
         "total_ekp_verified": sum(1 for a in ai_tags if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
         "total_tkp_verified": sum(1 for a in ai_tags if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
+        "avg_calls_day": round(tot_calls / max(1, base_summary.get("business_days", 1)), 1),
+        "avg_kps_day": round(tot_all_kps / max(1, base_summary.get("business_days", 1)), 1),
+        "avg_opps_day": round(sum(c.get("opps_total", 0) for c in commercials) / max(1, base_summary.get("business_days", 1)), 1),
+        "avg_calls_per_agent_day": round(tot_calls / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
+        "avg_kps_per_agent_day": round(tot_all_kps / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
+        "avg_opps_per_agent_day": round(sum(c.get("opps_total", 0) for c in commercials) / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
     })
+
+    filtered_daily_breakdown = []
+    for day_rec in result.get("team_daily_breakdown", []):
+        day_str = day_rec.get("date")
+        matched_user_recs = []
+        for c in commercials:
+            ur = next((r for r in c.get("daily_breakdown", []) if r.get("date") == day_str), None)
+            if ur:
+                matched_user_recs.append(ur)
+
+        c_out = sum(r.get("calls_out", 0) for r in matched_user_recs)
+        c_in = sum(r.get("calls_in", 0) for r in matched_user_recs)
+        c_tot = sum(r.get("calls_total", 0) for r in matched_user_recs)
+        dur_s = sum(r.get("gross_dial_time", {}).get("seconds", 0) for r in matched_user_recs)
+        l_kp = sum(r.get("live_kp", 0) for r in matched_user_recs)
+        ekp = sum(r.get("ekp", 0) for r in matched_user_recs)
+        tkp = sum(r.get("tkp", 0) for r in matched_user_recs)
+        tot_k = sum(r.get("total_kps", 0) for r in matched_user_recs)
+        op_s = sum(r.get("opps_sales", 0) for r in matched_user_recs)
+        op_p = sum(r.get("opps_purchase", 0) for r in matched_user_recs)
+        op_tot = sum(r.get("opps_total", 0) for r in matched_user_recs)
+        act = sum(1 for r in matched_user_recs if r.get("calls_total", 0) > 0 or r.get("total_kps", 0) > 0 or r.get("opps_total", 0) > 0)
+
+        filtered_daily_breakdown.append({
+            **day_rec,
+            "active_agents": act,
+            "calls_out": c_out,
+            "calls_in": c_in,
+            "calls_total": c_tot,
+            "gross_dial_time": format_duration(dur_s),
+            "live_kp": l_kp,
+            "ekp": ekp,
+            "tkp": tkp,
+            "total_kps": tot_k,
+            "effectiveness": round(100.0 * l_kp / c_tot, 1) if c_tot else 0.0,
+            "opps_sales": op_s,
+            "opps_purchase": op_p,
+            "opps_total": op_tot,
+            "avg_calls_per_agent": round(c_tot / max(1, act), 1) if act else 0.0,
+            "avg_kps_per_agent": round(tot_k / max(1, act), 1) if act else 0.0,
+            "avg_opps_per_agent": round(op_tot / max(1, act), 1) if act else 0.0,
+            "agent_records": matched_user_recs,
+        })
 
     ai_summary = {
         "calls_total": len(ai_calls),
@@ -367,6 +416,13 @@ def _filter_dashboard_for_team(result, allowed_user_ids):
         "gemini_enabled": any(str(a.get("model_used", "")).startswith("Gemini") for a in (ai_calls + ai_tags)),
     }
 
+    order_map = {agent["id"]: i for i, agent in enumerate(COMMERCIAL_TEAM)}
+    filtered_all_daily = []
+    for c in commercials:
+        for d in c.get("daily_breakdown", []):
+            filtered_all_daily.append(d)
+    filtered_all_daily.sort(key=lambda x: (-int(x["date"].replace("-", "")), order_map.get(x["user_id"], 99)))
+
     return {
         **result,
         "commercials": commercials,
@@ -378,6 +434,8 @@ def _filter_dashboard_for_team(result, allowed_user_ids):
         "ai_call_audits": ai_calls,
         "ai_tag_audits": ai_tags,
         "ai_summary": ai_summary,
+        "team_daily_breakdown": filtered_daily_breakdown,
+        "all_daily_breakdown": filtered_all_daily,
     }
 
 
@@ -1166,6 +1224,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "daily_records": all_daily_records,
             "latest_by_user": user_latest_checkpoints,
             "calls_by_user": calls_by_user,
+            "user_day_calls": user_day_calls,
         }
 
     # Ejecución paralela
@@ -1252,6 +1311,52 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         if a.get("verdict") == "VERIFICADO":
             tag_audits_by_user_type[(a.get("user_id"), a.get("type"))] += 1
 
+    # Pre-indexar oportunidades por asesor y por día (en hora local UTC-5)
+    opps_by_user_day = defaultdict(lambda: {"sales": 0, "purchase": 0, "total": 0})
+    for op in opps_data.get("list", []):
+        uid = op.get("user_id")
+        raw_d = op.get("date_created")
+        if not uid or not raw_d:
+            continue
+        try:
+            clean_dt = raw_d.replace("Z", "+00:00")
+            dt_local = datetime.fromisoformat(clean_dt).astimezone(local_tz)
+            day_str = dt_local.strftime("%Y-%m-%d")
+            pipe_type = op.get("pipeline_type", "")
+            if pipe_type == "Sales":
+                opps_by_user_day[(uid, day_str)]["sales"] += 1
+            elif pipe_type == "Purchase":
+                opps_by_user_day[(uid, day_str)]["purchase"] += 1
+            opps_by_user_day[(uid, day_str)]["total"] += 1
+        except Exception:
+            pass
+
+    # Pre-indexar notas #EKP y #TKP por asesor y por día (en hora local UTC-5)
+    tags_by_user_day = defaultdict(lambda: {"ekp": 0, "tkp": 0, "total": 0})
+    for rec in notes_tags.get("records", []):
+        uid = rec.get("user_id")
+        raw_d = rec.get("date")
+        if not uid or not raw_d:
+            continue
+        try:
+            clean_dt = raw_d.replace("Z", "+00:00")
+            dt_local = datetime.fromisoformat(clean_dt).astimezone(local_tz)
+            day_str = dt_local.strftime("%Y-%m-%d")
+            t = (rec.get("type") or "").upper()
+            if t == "EKP":
+                tags_by_user_day[(uid, day_str)]["ekp"] += 1
+                tags_by_user_day[(uid, day_str)]["total"] += 1
+            elif t == "TKP":
+                tags_by_user_day[(uid, day_str)]["tkp"] += 1
+                tags_by_user_day[(uid, day_str)]["total"] += 1
+        except Exception:
+            pass
+
+    short_days_es = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+    full_days_es = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    short_months_es = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    user_day_calls_map = call_gaps.get("user_day_calls", {})
+
     # --- Consolidación por Comercial en el Orden Estricto Requerido ---
     commercial_rows = []
     tot_out_calls = 0
@@ -1308,11 +1413,83 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         max_gap_min = max([g["gap_minutes"] for g in user_gaps], default=0)
         max_gap_human = f"{int(max_gap_min // 60)}h {int(max_gap_min % 60):02d}m" if max_gap_min >= 60 else f"{int(max_gap_min)} min" if max_gap_min > 0 else "-"
 
-        # Promedios diarios
-        avg_calls_day = round(c_total / business_days, 1)
-        avg_kps_day = round(all_kps / business_days, 1)
-        avg_call_kps_day = round(live_kp / business_days, 1)
-        avg_opps_day = round(op_total / business_days, 1)
+        # Promedios diarios individuales
+        avg_calls_day = round(c_total / max(1, business_days), 1)
+        avg_kps_day = round(all_kps / max(1, business_days), 1)
+        avg_call_kps_day = round(live_kp / max(1, business_days), 1)
+        avg_opps_day = round(op_total / max(1, business_days), 1)
+
+        # Desglose día a día para este comercial en el periodo
+        user_daily_breakdown = []
+        for day_s in days_list:
+            try:
+                d_obj = datetime.strptime(day_s, "%Y-%m-%d").date()
+            except Exception:
+                continue
+
+            ucalls_day = user_day_calls_map.get((uid, day_s), [])
+            c_out_d = sum(1 for _, c in ucalls_day if c.get("direction") == "outbound")
+            c_in_d = sum(1 for _, c in ucalls_day if c.get("direction") == "inbound")
+            c_tot_d = len(ucalls_day)
+            dur_s_d = sum(int(c.get("duration") or 0) for _, c in ucalls_day)
+            l_kp_d = sum(1 for _, c in ucalls_day if c.get("outcome_id") == KP_OUTCOME_ID)
+
+            t_data_d = tags_by_user_day.get((uid, day_s), {"ekp": 0, "tkp": 0, "total": 0})
+            ekp_d = t_data_d["ekp"]
+            tkp_d = t_data_d["tkp"]
+            tot_kps_d = l_kp_d + ekp_d + tkp_d
+
+            o_data_d = opps_by_user_day.get((uid, day_s), {"sales": 0, "purchase": 0, "total": 0})
+            o_s_d = o_data_d["sales"]
+            o_p_d = o_data_d["purchase"]
+            o_tot_d = o_data_d["total"]
+
+            eff_d = round(100.0 * l_kp_d / c_tot_d, 1) if c_tot_d else 0.0
+
+            first_t_d = ucalls_day[0][0].strftime("%I:%M %p") if ucalls_day else "-"
+            last_t_d = ucalls_day[-1][0].strftime("%I:%M %p") if ucalls_day else "-"
+
+            m_c = c_tot_d >= DAILY_GOAL_CALLS
+            m_k = tot_kps_d >= DAILY_GOAL_TOTAL_KPS
+            m_ck = l_kp_d >= DAILY_GOAL_CALL_KPS
+            m_o = o_tot_d >= DAILY_GOAL_OPPS
+
+            st_class = "ok" if (m_c and m_k and m_o) else ("warning" if (m_c or m_k or m_o) else "danger")
+            st_label = "Cumple Todo" if (m_c and m_k and m_o) else ("Parcial" if (m_c or m_k or m_o) else "Bajo Meta")
+
+            user_daily_breakdown.append({
+                "user_id": uid,
+                "user_name": agent["name"],
+                "date": day_s,
+                "date_label": f"{short_days_es[d_obj.weekday()]} {d_obj.day}/{short_months_es[d_obj.month]}",
+                "weekday": full_days_es[d_obj.weekday()],
+                "weekday_short": short_days_es[d_obj.weekday()],
+                "is_weekend": d_obj.weekday() >= 5,
+                "calls_out": c_out_d,
+                "calls_in": c_in_d,
+                "calls_total": c_tot_d,
+                "gross_dial_time": format_duration(dur_s_d),
+                "first_call_time": first_t_d,
+                "last_call_time": last_t_d,
+                "live_kp": l_kp_d,
+                "ekp": ekp_d,
+                "tkp": tkp_d,
+                "total_kps": tot_kps_d,
+                "effectiveness": eff_d,
+                "opps_sales": o_s_d,
+                "opps_purchase": o_p_d,
+                "opps_total": o_tot_d,
+                "met_calls": m_c,
+                "calls_pct": round(100.0 * c_tot_d / DAILY_GOAL_CALLS, 1),
+                "met_kps": m_k,
+                "kps_pct": round(100.0 * tot_kps_d / DAILY_GOAL_TOTAL_KPS, 1),
+                "met_call_kps": m_ck,
+                "call_kps_pct": round(100.0 * l_kp_d / DAILY_GOAL_CALL_KPS, 1),
+                "met_opps": m_o,
+                "opps_pct": round(100.0 * o_tot_d / DAILY_GOAL_OPPS, 1),
+                "status_class": st_class,
+                "status_label": st_label,
+            })
 
         # Cumplimiento contra metas del periodo
         calls_pct = round(100.0 * c_total / period_target_calls, 1) if period_target_calls else 0.0
@@ -1411,12 +1588,66 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             "met_opps": met_opps,
             "status_goal": status_goal,
             "status_class": status_class,
+            # Desglose diario detallado
+            "daily_breakdown": user_daily_breakdown,
             # Detalle individual completo para el reporte interactivo del asesor
             "calls_list": call_gaps.get("calls_by_user", {}).get(uid, [])[:120],
             "kp_calls_list": [a for a in ai_call_audits if a.get("user_id") == uid],
             "kp_tags_list": [t for t in ai_tag_audits if t.get("user_id") == uid],
             "opportunities": [op for op in opps_data.get("list", []) if op.get("user_id") == uid],
             "discipline_records": [d for d in call_gaps.get("daily_records", []) if d.get("user_id") == uid],
+        })
+
+    # Resumen diario acumulado de todo el equipo día por día
+    team_daily_breakdown = []
+    for day_s in days_list:
+        try:
+            d_obj = datetime.strptime(day_s, "%Y-%m-%d").date()
+        except Exception:
+            continue
+
+        day_agent_recs = []
+        for c in commercial_rows:
+            d_rec = next((r for r in c.get("daily_breakdown", []) if r["date"] == day_s), None)
+            if d_rec:
+                day_agent_recs.append(d_rec)
+
+        d_c_out = sum(r["calls_out"] for r in day_agent_recs)
+        d_c_in = sum(r["calls_in"] for r in day_agent_recs)
+        d_c_tot = sum(r["calls_total"] for r in day_agent_recs)
+        d_dur_s = sum(r["gross_dial_time"]["seconds"] for r in day_agent_recs)
+        d_live_kp = sum(r["live_kp"] for r in day_agent_recs)
+        d_ekp = sum(r["ekp"] for r in day_agent_recs)
+        d_tkp = sum(r["tkp"] for r in day_agent_recs)
+        d_tot_kps = sum(r["total_kps"] for r in day_agent_recs)
+        d_opps_s = sum(r["opps_sales"] for r in day_agent_recs)
+        d_opps_p = sum(r["opps_purchase"] for r in day_agent_recs)
+        d_opps_tot = sum(r["opps_total"] for r in day_agent_recs)
+        act_agents = sum(1 for r in day_agent_recs if r["calls_total"] > 0 or r["total_kps"] > 0 or r["opps_total"] > 0)
+
+        team_daily_breakdown.append({
+            "date": day_s,
+            "date_label": f"{short_days_es[d_obj.weekday()]} {d_obj.day}/{short_months_es[d_obj.month]}",
+            "weekday": full_days_es[d_obj.weekday()],
+            "weekday_short": short_days_es[d_obj.weekday()],
+            "is_weekend": d_obj.weekday() >= 5,
+            "active_agents": act_agents,
+            "calls_out": d_c_out,
+            "calls_in": d_c_in,
+            "calls_total": d_c_tot,
+            "gross_dial_time": format_duration(d_dur_s),
+            "live_kp": d_live_kp,
+            "ekp": d_ekp,
+            "tkp": d_tkp,
+            "total_kps": d_tot_kps,
+            "effectiveness": round(100.0 * d_live_kp / d_c_tot, 1) if d_c_tot else 0.0,
+            "opps_sales": d_opps_s,
+            "opps_purchase": d_opps_p,
+            "opps_total": d_opps_tot,
+            "avg_calls_per_agent": round(d_c_tot / max(1, act_agents), 1) if act_agents else 0.0,
+            "avg_kps_per_agent": round(d_tot_kps / max(1, act_agents), 1) if act_agents else 0.0,
+            "avg_opps_per_agent": round(d_opps_tot / max(1, act_agents), 1) if act_agents else 0.0,
+            "agent_records": day_agent_recs,
         })
 
     # Mantenemos el orden predeterminado estricto de COMMERCIAL_TEAM solicitado por Hernán
@@ -1457,6 +1688,13 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "total_live_kp_verified": sum(1 for a in ai_call_audits if a.get("verdict") == "VERIFICADO"),
         "total_ekp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
         "total_tkp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
+        # Promedios diarios del equipo y por comercial
+        "avg_calls_day": round(tot_calls / max(1, business_days), 1),
+        "avg_kps_day": round(tot_all_kps / max(1, business_days), 1),
+        "avg_opps_day": round(tot_opps / max(1, business_days), 1),
+        "avg_calls_per_agent_day": round(tot_calls / max(1, business_days * max(1, len(commercial_rows))), 1),
+        "avg_kps_per_agent_day": round(tot_all_kps / max(1, business_days * max(1, len(commercial_rows))), 1),
+        "avg_opps_per_agent_day": round(tot_opps / max(1, business_days * max(1, len(commercial_rows))), 1),
     }
 
     ai_summary = {
@@ -1475,6 +1713,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "gemini_enabled": any(str(a.get("model_used", "")).startswith("Gemini") for a in (ai_call_audits + ai_tag_audits)),
     }
 
+    order_map = {agent["id"]: i for i, agent in enumerate(COMMERCIAL_TEAM)}
     result = {
         "start_date": start_date,
         "end_date": end_date,
@@ -1488,6 +1727,11 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "ai_call_audits": ai_call_audits,
         "ai_tag_audits": ai_tag_audits,
         "ai_summary": ai_summary,
+        "team_daily_breakdown": team_daily_breakdown,
+        "all_daily_breakdown": sorted(
+            [d for c in commercial_rows for d in c.get("daily_breakdown", [])],
+            key=lambda x: (-int(x["date"].replace("-", "")), order_map.get(x["user_id"], 99))
+        ),
     }
 
     today_str = date.today().isoformat()

@@ -376,6 +376,17 @@ def verify_kp_calls_batch(call_records, force=False):
     for cid in re_audit_ids:
         cached.pop(cid, None)
 
+    if re_audit_ids:
+        try:
+            placeholders = ",".join("?" for _ in re_audit_ids)
+            with db.get_conn() as conn:
+                conn.execute(
+                    f"DELETE FROM ai_verifications WHERE activity_id IN ({placeholders})",
+                    list(re_audit_ids),
+                )
+        except Exception:
+            pass
+
     missing_ids = [cid for cid in ids if cid not in cached]
 
     gemini_client = _get_gemini_client() if missing_ids else None

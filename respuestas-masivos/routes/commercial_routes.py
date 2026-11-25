@@ -452,3 +452,98 @@ def register_commercial_routes(app):
             mimetype="text/csv; charset=utf-8",
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
+
+    @app.route("/commercial-dashboard/daily-breakdown-export.csv")
+    @auth.login_required
+    def export_daily_breakdown_csv():
+        today_iso = date.today().isoformat()
+        start_date = request.args.get("start_date") or today_iso
+        end_date = request.args.get("end_date") or today_iso
+        agent_filter = request.args.get("agent_id") or ""
+
+        data = commercial_dashboard.get_commercial_dashboard_data(
+            start_date=start_date,
+            end_date=end_date,
+            include_all_commercials=_include_all_commercials(),
+        )
+
+        rows = data.get("commercial_rows", []) if data else []
+        if agent_filter:
+            rows = [r for r in rows if r.get("id") == agent_filter]
+
+        if not rows:
+            flash("No hay datos de desglose diario para el periodo seleccionado.", "info")
+            return redirect(url_for("commercial_dashboard_view", start_date=start_date, end_date=end_date))
+
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow([
+            "Asesor Comercial",
+            "Email",
+            "Fecha",
+            "Dia Semana",
+            "Horario Programado",
+            "Primera Llamada",
+            "Ultima Llamada",
+            "Llamadas Salientes",
+            "Llamadas Entrantes",
+            "Total Llamadas",
+            "Gross Dial Time",
+            "Live KP (Llamada)",
+            "#EKP (Email KP)",
+            "#TKP (Text KP)",
+            "Total KPs",
+            "Efectividad KP (%)",
+            "Oportunidades Sales",
+            "Oportunidades Purchase",
+            "Total Oportunidades",
+            "Meta Llamadas (120)",
+            "% Cumpl. Llamadas",
+            "Meta KPs (15)",
+            "% Cumpl. KPs",
+            "Meta Opps (5)",
+            "% Cumpl. Opps",
+            "Estado Cumplimiento"
+        ])
+
+        for comm in rows:
+            user_name = comm.get("name", "")
+            user_email = comm.get("email", "")
+            sched = comm.get("schedule_label", "")
+            for d in comm.get("daily_breakdown", []):
+                writer.writerow([
+                    user_name,
+                    user_email,
+                    d.get("date", ""),
+                    d.get("weekday", ""),
+                    sched,
+                    d.get("first_call_time") or "-",
+                    d.get("last_call_time") or "-",
+                    d.get("calls_out", 0),
+                    d.get("calls_in", 0),
+                    d.get("calls_total", 0),
+                    d.get("gross_dial_time", "0s"),
+                    d.get("live_kp", 0),
+                    d.get("ekp", 0),
+                    d.get("tkp", 0),
+                    d.get("total_kps", 0),
+                    f"{d.get('effectiveness', 0.0):.2f}%",
+                    d.get("opps_sales", 0),
+                    d.get("opps_purchase", 0),
+                    d.get("opps_total", 0),
+                    120,
+                    f"{d.get('calls_pct', 0.0):.1f}%",
+                    15,
+                    f"{d.get('kps_pct', 0.0):.1f}%",
+                    5,
+                    f"{d.get('opps_pct', 0.0):.1f}%",
+                    d.get("status_label", "")
+                ])
+
+        output.seek(0)
+        filename = f"desglose_diario_comerciales_{start_date}_{end_date}.csv"
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
