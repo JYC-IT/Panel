@@ -613,282 +613,117 @@
   </div>
 </div>
 
-<!-- SECCIÓN DESGLOSE DIARIO POR ASESOR COMERCIAL (SOLICITADO POR DIRECCIÓN / HERNÁN) -->
+{% if data.team_daily_breakdown|length > 1 %}
+<!-- SECCIÓN DESGLOSE DIARIO: LLAMADAS, KPS Y OPORTUNIDADES (SOLO EN PERIODOS MULTI-DÍA) -->
 <div class="executive-panel" id="dailyBreakdownSection" style="padding: 0; overflow: hidden; margin-bottom: 28px; border: 1px solid #c7d2fe; box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.05);">
-  <div style="padding: 18px 24px; border-bottom: 1px solid var(--border); background: #eef2ff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+  <div style="padding: 16px 24px; border-bottom: 1px solid var(--border); background: #eef2ff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
     <div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="badge" style="background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; font-weight: 800; font-size: 11px;">
-          DESGLOSE DIARIO Y PROMEDIOS
-        </span>
-        <h3 style="margin: 0; font-size: 16.5px; font-weight: 800; color: #312e81;">
-          Desglose Diario por Comercial: Llamadas, KPs y Oportunidades
-        </h3>
-      </div>
-      <p style="margin: 4px 0 0; font-size: 12.5px; color: #4338ca;">
-        Selecciona <strong>Todo el Equipo</strong> o cualquier <strong>Comercial</strong> para ver cada día separado con sus totales y promedios diarios de llamadas, KPs y oportunidades en el periodo seleccionado ({{ data.start_date }} a {{ data.end_date }}).
+      <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #312e81;">
+        Desglose Diario: Llamadas, KPs y Oportunidades
+      </h3>
+      <p style="margin: 3px 0 0; font-size: 12.5px; color: #4338ca;">
+        Actividad separada día a día y promedios diarios (<strong id="dailyActiveLabel">Todo el Equipo</strong> · {{ data.business_days }} días hábiles).
       </p>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-      <a id="dailyCsvExportBtn" href="{{ url_for('export_daily_breakdown_csv', start_date=data.start_date, end_date=data.end_date) }}" data-base-url="{{ url_for('export_daily_breakdown_csv', start_date=data.start_date, end_date=data.end_date) }}" class="btn-executive secondary" style="padding: 7px 12px; font-size: 12px; text-decoration: none; border-color: #a5b4fc; background: white; color: #4338ca;" title="Descargar desglose diario a CSV">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <a id="dailyCsvExportBtn" href="{{ url_for('export_daily_breakdown_csv', start_date=data.start_date, end_date=data.end_date) }}" data-base-url="{{ url_for('export_daily_breakdown_csv', start_date=data.start_date, end_date=data.end_date) }}" class="btn-executive secondary" style="padding: 6px 12px; font-size: 12px; text-decoration: none; border-color: #a5b4fc; background: white; color: #4338ca;" title="Descargar desglose diario a CSV">
         <svg style="width: 13px; height: 13px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        Descargar Desglose CSV
+        Descargar CSV
       </a>
-      <span class="badge" style="background: white; border: 1px solid #a5b4fc; color: #4338ca; font-weight: 800; font-size: 12px; padding: 4px 10px;">
-        {{ data.business_days }} Días Hábiles
-      </span>
     </div>
   </div>
 
-  <!-- 3 TARJETAS DINÁMICAS DE PROMEDIO POR DÍA (SE ACTUALIZAN AL SELECCIONAR CADA COMERCIAL) -->
-  <div style="padding: 16px 24px; background: white; border-bottom: 1px solid var(--border);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-      <div style="font-size: 12.5px; font-weight: 800; color: var(--text-main);">
-        Mostrando promedios diarios de: <span id="dailyActiveLabel" style="color: #4338ca; background: #eef2ff; padding: 3px 10px; border-radius: 9999px; border: 1px solid #c7d2fe;">Todo el Equipo ({{ data.commercials|length }} comerciales)</span>
-      </div>
-      <div style="font-size: 11.5px; color: var(--text-muted);">
-        Base de cálculo: <strong>{{ data.business_days }}</strong> día(s) hábil(es) en el periodo
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
-      <!-- Tarjeta Promedio Llamadas/día -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #4f46e5; border-radius: 10px; padding: 12px 16px;">
-        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-secondary);">
-          Promedio de Llamadas por Día
-        </div>
-        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-top: 6px;">
-          <span id="dailyCardAvgCalls" style="font-size: 24px; font-weight: 900; color: #312e81;">{{ data.summary.avg_calls_day }}</span>
-          <span style="font-size: 11.5px; color: var(--text-muted);">Total: <strong id="dailyCardTotCalls" style="color: var(--text-main);">{{ data.summary.total_calls }}</strong></span>
-        </div>
-      </div>
-
-      <!-- Tarjeta Promedio KPs/día -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #059669; border-radius: 10px; padding: 12px 16px;">
-        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-secondary);">
-          Promedio de KPs por Día
-        </div>
-        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-top: 6px;">
-          <span id="dailyCardAvgKps" style="font-size: 24px; font-weight: 900; color: #059669;">{{ data.summary.avg_kps_day }}</span>
-          <span style="font-size: 11.5px; color: var(--text-muted);">Total: <strong id="dailyCardTotKps" style="color: var(--text-main);">{{ data.summary.total_all_kps }}</strong></span>
-        </div>
-      </div>
-
-      <!-- Tarjeta Promedio Oportunidades/día -->
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #7c3aed; border-radius: 10px; padding: 12px 16px;">
-        <div style="font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-secondary);">
-          Promedio de Oportunidades por Día
-        </div>
-        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-top: 6px;">
-          <span id="dailyCardAvgOpps" style="font-size: 24px; font-weight: 900; color: #7c3aed;">{{ data.summary.avg_opps_day }}</span>
-          <span style="font-size: 11.5px; color: var(--text-muted);">Total: <strong id="dailyCardTotOpps" style="color: var(--text-main);">{{ data.summary.total_opps }}</strong></span>
-        </div>
-      </div>
-    </div>
+  <!-- Selector limpio: Todo el Equipo o por Comercial -->
+  <div style="padding: 10px 24px; background: #fafafa; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+    <button type="button" class="daily-pill active" onclick="filterDailyCommercial('team', this)" style="border: 1px solid #c7d2fe; background: #4338ca; color: white; padding: 4px 11px; border-radius: 9999px; font-size: 11.5px; font-weight: 700; cursor: pointer;">
+      Todo el Equipo
+    </button>
+    {% for comm in data.commercials %}
+    <button type="button" class="daily-pill" onclick="filterDailyCommercial('{{ comm.id }}', this)" style="border: 1px solid var(--border); background: white; color: var(--text-main); padding: 4px 11px; border-radius: 9999px; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+      {{ comm.name }}
+    </button>
+    {% endfor %}
   </div>
 
-  <!-- Píldoras de Filtro Rápido por Asesor -->
-  <div style="padding: 12px 24px; background: #fafafa; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
-    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <span style="font-size: 11.5px; font-weight: 700; color: var(--text-secondary); margin-right: 4px;">Ver por:</span>
-      <button type="button" class="daily-pill active" onclick="filterDailyCommercial('team', this)" style="border: 1px solid #c7d2fe; background: #4338ca; color: white; padding: 5px 11px; border-radius: 9999px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: all 0.15s ease;">
-        Todo el Equipo (Por Día)
-      </button>
-      {% for comm in data.commercials %}
-      <button type="button" class="daily-pill" onclick="filterDailyCommercial('{{ comm.id }}', this)" style="border: 1px solid var(--border); background: white; color: var(--text-main); padding: 5px 11px; border-radius: 9999px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
-        {{ comm.name.split()[0] }} {% if comm.name.split()|length > 1 %}{{ comm.name.split()[1] }}{% endif %}
-      </button>
-      {% endfor %}
-      <button type="button" class="daily-pill" onclick="filterDailyCommercial('all', this)" style="border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; padding: 5px 11px; border-radius: 9999px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
-        Todos Desglosados ({{ data.all_daily_breakdown|length }})
-      </button>
-    </div>
-
-    <div>
-      <input type="text" id="dailyBreakdownSearch" placeholder="Buscar fecha o asesor..." onkeyup="filterDailyBreakdownSearch()" style="padding: 5px 11px; font-size: 12px; border-radius: var(--radius-md); border: 1px solid var(--border); width: 190px;">
-    </div>
-  </div>
-
-  <!-- Tabla de Desglose Diario -->
-  <div style="overflow-x: auto; max-height: 540px; overflow-y: auto;">
-    <table class="data-table" id="dailyBreakdownTable" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+  <!-- Tabla limpia de 4 columnas: Día, Llamadas, KPs, Oportunidades -->
+  <div style="overflow-x: auto;">
+    <table class="data-table" id="dailyBreakdownTable" style="width: 100%; border-collapse: collapse; font-size: 13px;">
       <thead>
-        <tr style="background: #f8fafc; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;">
-          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Fecha &amp; Día</th>
-          <th style="padding: 10px 14px; text-align: left; font-weight: 700; color: var(--text-secondary);">Comercial / Equipo</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Llamadas (Out / In / Total)</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Dial Time</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: #0284c7;">Live KP</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: #7c3aed;">#EKP / #TKP</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 800; color: #059669;">Total KPs</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Efectividad</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Oportunidades (Sell / Purch)</th>
-          <th style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--text-secondary);">Estado / Meta</th>
+        <tr style="background: #f8fafc; border-bottom: 1px solid var(--border);">
+          <th style="padding: 10px 20px; text-align: left; font-weight: 700; color: var(--text-secondary);">Día</th>
+          <th style="padding: 10px 20px; text-align: center; font-weight: 700; color: var(--text-secondary);">Llamadas</th>
+          <th style="padding: 10px 20px; text-align: center; font-weight: 700; color: #059669;">KPs</th>
+          <th style="padding: 10px 20px; text-align: center; font-weight: 700; color: #7c3aed;">Oportunidades</th>
         </tr>
       </thead>
       <tbody>
-        <!-- FILAS DE RESUMEN DEL EQUIPO DÍA POR DÍA (VISIBLES POR DEFECTO) -->
+        <!-- Vista por defecto: Todo el Equipo día por día -->
         {% for td in data.team_daily_breakdown %}
-        <tr class="daily-team-row" data-search="equipo {{ td.date }} {{ td.weekday.lower() }}" style="border-bottom: 1px solid var(--border); {% if td.is_weekend %}background: #fbfbfb;{% endif %}">
-          <td style="padding: 11px 14px; white-space: nowrap;">
-            <div style="font-weight: 800; color: var(--text-main);">{{ td.date_label }}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">{{ td.weekday }} {% if td.is_weekend %}<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 9.5px; padding: 1px 5px;">Fin de semana</span>{% endif %}</div>
+        <tr class="daily-team-row" style="border-bottom: 1px solid var(--border); {% if td.is_weekend %}background: #fbfbfb;{% endif %}">
+          <td style="padding: 10px 20px; white-space: nowrap;">
+            <strong style="color: var(--text-main);">{{ td.date_label }}</strong>
+            <span style="font-size: 11.5px; color: var(--text-muted); margin-left: 6px;">{{ td.weekday }}</span>
           </td>
-          <td style="padding: 11px 14px; white-space: nowrap;">
-            <div style="font-weight: 800; color: #312e81;">Equipo Completo</div>
-            <div style="font-size: 11px; color: var(--text-muted);">{{ td.active_agents }} comerciales con actividad</div>
+          <td style="padding: 10px 20px; text-align: center;">
+            <span style="font-weight: 800; font-size: 14.5px; color: var(--text-main);">{{ td.calls_total }}</span>
+            <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">({{ td.calls_out }} Out / {{ td.calls_in }} In)</span>
           </td>
-          <td style="padding: 11px 14px; text-align: center;">
-            <div style="font-weight: 800; font-size: 14px; color: var(--text-main);">{{ td.calls_total }}</div>
-            <div style="font-size: 10.5px; color: var(--text-muted);">{{ td.calls_out }} Out / {{ td.calls_in }} In</div>
+          <td style="padding: 10px 20px; text-align: center;">
+            <span style="font-weight: 800; font-size: 14.5px; color: #059669;">{{ td.total_kps }}</span>
+            <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">({{ td.live_kp }} Live · {{ td.ekp }} EKP · {{ td.tkp }} TKP)</span>
           </td>
-          <td style="padding: 11px 14px; text-align: center; font-weight: 700; color: var(--brand); font-size: 12px;">
-            {{ td.gross_dial_time.human }}
-          </td>
-          <td style="padding: 11px 14px; text-align: center; font-weight: 800; color: #0284c7; font-size: 13.5px;">
-            {{ td.live_kp }}
-          </td>
-          <td style="padding: 11px 14px; text-align: center; font-size: 11.5px;">
-            <span style="color: #7c3aed; font-weight: 700;">{{ td.ekp }} EKP</span> |
-            <span style="color: #d97706; font-weight: 700;">{{ td.tkp }} TKP</span>
-          </td>
-          <td style="padding: 11px 14px; text-align: center; font-weight: 900; color: #059669; font-size: 14.5px;">
-            {{ td.total_kps }}
-          </td>
-          <td style="padding: 11px 14px; text-align: center; font-weight: 700; font-size: 11.5px; color: var(--text-secondary);">
-            {{ td.effectiveness }}%
-          </td>
-          <td style="padding: 11px 14px; text-align: center;">
-            <div style="font-weight: 800; font-size: 14px; color: var(--text-main);">{{ td.opps_total }}</div>
-            <div style="font-size: 10.5px; color: var(--text-muted);">
-              <span style="color: #0284c7; font-weight: 600;">{{ td.opps_sales }} S</span> |
-              <span style="color: #7c3aed; font-weight: 600;">{{ td.opps_purchase }} P</span>
-            </div>
-          </td>
-          <td style="padding: 11px 14px; text-align: center; font-size: 11px; color: var(--text-secondary);">
-            Prom/asesor activo: <strong>{{ td.avg_calls_per_agent }}</strong> ll · <strong>{{ td.avg_kps_per_agent }}</strong> kp · <strong>{{ td.avg_opps_per_agent }}</strong> op
+          <td style="padding: 10px 20px; text-align: center;">
+            <span style="font-weight: 800; font-size: 14.5px; color: #7c3aed;">{{ td.opps_total }}</span>
+            <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">({{ td.opps_sales }} Sell · {{ td.opps_purchase }} Purch)</span>
           </td>
         </tr>
         {% endfor %}
 
-        <!-- FILAS INDIVIDUALES POR COMERCIAL Y DÍA (OCULTAS POR DEFECTO HASTA SELECCIONAR COMERCIAL O TODOS) -->
-        {% for d in data.all_daily_breakdown %}
-        <tr class="daily-breakdown-row" data-user-id="{{ d.user_id }}" data-search="{{ d.user_name.lower() }} {{ d.date }} {{ d.weekday.lower() }}" style="display: none; border-bottom: 1px solid var(--border); {% if d.is_weekend %}background: #fbfbfb;{% endif %}">
-          <td style="padding: 10px 14px; white-space: nowrap;">
-            <div style="font-weight: 800; color: var(--text-main);">{{ d.date_label }}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">{{ d.weekday }} {% if d.is_weekend %}<span class="badge" style="background: #f1f5f9; color: #64748b; font-size: 9.5px; padding: 1px 5px;">Fin de semana</span>{% endif %}</div>
-          </td>
-          <td style="padding: 10px 14px; white-space: nowrap;">
-            <a href="/commercial-dashboard/agent/{{ d.user_id }}?start_date={{ data.start_date }}&end_date={{ data.end_date }}" style="text-decoration: none; font-weight: 700; color: var(--brand);">
-              {{ d.user_name }}
-            </a>
-            {% if d.first_call_time and d.first_call_time != '-' %}
-            <div style="font-size: 10.5px; color: var(--text-muted);">{{ d.first_call_time }} &rarr; {{ d.last_call_time }}</div>
-            {% endif %}
-          </td>
-          <td style="padding: 10px 14px; text-align: center;">
-            <div style="font-weight: 800; font-size: 13.5px; color: var(--text-main);">{{ d.calls_total }}</div>
-            <div style="font-size: 10.5px; color: var(--text-muted);">{{ d.calls_out }} Out / {{ d.calls_in }} In</div>
-          </td>
-          <td style="padding: 10px 14px; text-align: center; font-weight: 700; color: var(--brand); font-size: 12px;">
-            {{ d.gross_dial_time.human }}
-          </td>
-          <td style="padding: 10px 14px; text-align: center; font-weight: 800; color: #0284c7; font-size: 13px;">
-            {{ d.live_kp }}
-          </td>
-          <td style="padding: 10px 14px; text-align: center; font-size: 11.5px;">
-            <span style="color: #7c3aed; font-weight: 700;" title="Email KP">{{ d.ekp }} EKP</span> |
-            <span style="color: #d97706; font-weight: 700;" title="Text KP">{{ d.tkp }} TKP</span>
-          </td>
-          <td style="padding: 10px 14px; text-align: center; font-weight: 900; color: #059669; font-size: 14px;">
-            {{ d.total_kps }}
-          </td>
-          <td style="padding: 10px 14px; text-align: center; font-weight: 700; font-size: 11.5px; color: var(--text-secondary);">
-            {{ d.effectiveness }}%
-          </td>
-          <td style="padding: 10px 14px; text-align: center;">
-            <div style="font-weight: 800; font-size: 13.5px; color: var(--text-main);">{{ d.opps_total }}</div>
-            <div style="font-size: 10.5px; color: var(--text-muted);">
-              <span style="color: #0284c7; font-weight: 600;">{{ d.opps_sales }} S</span> |
-              <span style="color: #7c3aed; font-weight: 600;">{{ d.opps_purchase }} P</span>
-            </div>
-          </td>
-          <td style="padding: 10px 14px; text-align: center;">
-            <span class="badge" style="font-size: 10.5px; font-weight: 800; padding: 3px 8px; {% if d.status_class == 'ok' %}background: #dcfce7; color: #15803d; border: 1px solid #86efac;{% elif d.status_class == 'warning' %}background: #fef3c7; color: #b45309; border: 1px solid #fde68a;{% else %}background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;{% endif %}">
-              {{ d.status_label }}
-            </span>
-            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
-              {{ d.calls_pct }}% ll · {{ d.kps_pct }}% kp · {{ d.opps_pct }}% op
-            </div>
-          </td>
-        </tr>
+        <!-- Filas por comercial (se muestran al seleccionar un comercial) -->
+        {% for comm in data.commercials %}
+          {% for d in comm.daily_breakdown %}
+          <tr class="daily-breakdown-row" data-user-id="{{ comm.id }}" style="display: none; border-bottom: 1px solid var(--border); {% if d.is_weekend %}background: #fbfbfb;{% endif %}">
+            <td style="padding: 10px 20px; white-space: nowrap;">
+              <strong style="color: var(--text-main);">{{ d.date_label }}</strong>
+              <span style="font-size: 11.5px; color: var(--text-muted); margin-left: 6px;">{{ d.weekday }}</span>
+            </td>
+            <td style="padding: 10px 20px; text-align: center;">
+              <span style="font-weight: 800; font-size: 14.5px; color: var(--text-main);">{{ d.calls_total }}</span>
+              <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">({{ d.calls_out }} Out / {{ d.calls_in }} In)</span>
+            </td>
+            <td style="padding: 10px 20px; text-align: center;">
+              <span style="font-weight: 800; font-size: 14.5px; color: #059669;">{{ d.total_kps }}</span>
+              <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">({{ d.live_kp }} Live · {{ d.ekp }} EKP · {{ d.tkp }} TKP)</span>
+            </td>
+            <td style="padding: 10px 20px; text-align: center;">
+              <span style="font-weight: 800; font-size: 14.5px; color: #7c3aed;">{{ d.opps_total }}</span>
+              <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">({{ d.opps_sales }} Sell · {{ d.opps_purchase }} Purch)</span>
+            </td>
+          </tr>
+          {% endfor %}
         {% endfor %}
       </tbody>
       <tfoot>
-        <!-- Fila 1: TOTAL PERIODO -->
         <tr style="background: #f8fafc; border-top: 2px solid var(--border); font-weight: 800;">
-          <td style="padding: 12px 14px;" colspan="2">
-            <div style="font-size: 13px; font-weight: 900; color: var(--text-main);">TOTAL PERIODO (<span id="dailyFootName">Todo el Equipo</span>)</div>
-            <div style="font-size: 11px; color: var(--text-muted);">{{ data.start_date }} a {{ data.end_date }}</div>
-          </td>
-          <td style="padding: 12px 14px; text-align: center;">
-            <div id="dailyFootTotCalls" style="font-size: 15px; font-weight: 900; color: var(--text-main);">{{ data.summary.total_calls }}</div>
-            <div id="dailyFootOutIn" style="font-size: 10.5px; color: var(--text-muted);">{{ data.summary.total_out_calls }} Out / {{ data.summary.total_in_calls }} In</div>
-          </td>
-          <td id="dailyFootDialTime" style="padding: 12px 14px; text-align: center; color: var(--brand); font-weight: 900;">
-            {{ data.summary.gross_dial_time.human }}
-          </td>
-          <td id="dailyFootLiveKp" style="padding: 12px 14px; text-align: center; color: #0284c7; font-size: 14px; font-weight: 900;">
-            {{ data.summary.total_live_kps }}
-          </td>
-          <td id="dailyFootEkpTkp" style="padding: 12px 14px; text-align: center; font-size: 11.5px;">
-            <span style="color: #7c3aed; font-weight: 700;">{{ data.summary.total_ekp }} EKP</span> |
-            <span style="color: #d97706; font-weight: 700;">{{ data.summary.total_tkp }} TKP</span>
-          </td>
-          <td id="dailyFootTotKps" style="padding: 12px 14px; text-align: center; color: #059669; font-size: 16px; font-weight: 900;">
-            {{ data.summary.total_all_kps }}
-          </td>
-          <td id="dailyFootEff" style="padding: 12px 14px; text-align: center; font-weight: 800; color: var(--text-secondary);">
-            {{ data.summary.team_effectiveness }}%
-          </td>
-          <td style="padding: 12px 14px; text-align: center;">
-            <div id="dailyFootTotOpps" style="font-size: 15px; font-weight: 900; color: var(--text-main);">{{ data.summary.total_opps }}</div>
-            <div id="dailyFootOppsSP" style="font-size: 10.5px; color: var(--text-muted);">{{ data.summary.total_opps_sales }} S / {{ data.summary.total_opps_purchase }} P</div>
-          </td>
-          <td style="padding: 12px 14px; text-align: center; font-size: 11px; color: var(--text-muted);">
-            {{ data.business_days }} días hábiles
-          </td>
+          <td style="padding: 11px 20px; color: var(--text-main);">TOTAL PERIODO</td>
+          <td id="dailyFootTotCalls" style="padding: 11px 20px; text-align: center; font-size: 15px; color: var(--text-main);">{{ data.summary.total_calls }}</td>
+          <td id="dailyFootTotKps" style="padding: 11px 20px; text-align: center; font-size: 15px; color: #059669;">{{ data.summary.total_all_kps }}</td>
+          <td id="dailyFootTotOpps" style="padding: 11px 20px; text-align: center; font-size: 15px; color: #7c3aed;">{{ data.summary.total_opps }}</td>
         </tr>
-        <!-- Fila 2: PROMEDIO POR DÍA -->
-        <tr style="background: #eef2ff; border-top: 1px solid #c7d2fe; font-weight: 800;">
-          <td style="padding: 12px 14px;" colspan="2">
-            <div style="font-size: 13px; font-weight: 900; color: #312e81;">PROMEDIO POR DÍA</div>
-            <div style="font-size: 11px; color: #4338ca;">Llamadas, KPs y Oportunidades / día</div>
-          </td>
-          <td style="padding: 12px 14px; text-align: center;">
-            <div id="dailyFootAvgCalls" style="font-size: 16px; font-weight: 900; color: #312e81;">{{ data.summary.avg_calls_day }} / día</div>
-          </td>
-          <td style="padding: 12px 14px; text-align: center; color: #4338ca; font-size: 11px;">-</td>
-          <td style="padding: 12px 14px; text-align: center; color: #4338ca; font-size: 11px;">-</td>
-          <td style="padding: 12px 14px; text-align: center; color: #4338ca; font-size: 11px;">-</td>
-          <td style="padding: 12px 14px; text-align: center;">
-            <div id="dailyFootAvgKps" style="font-size: 16px; font-weight: 900; color: #059669;">{{ data.summary.avg_kps_day }} / día</div>
-          </td>
-          <td style="padding: 12px 14px; text-align: center; color: #4338ca; font-size: 11px;">-</td>
-          <td style="padding: 12px 14px; text-align: center;">
-            <div id="dailyFootAvgOpps" style="font-size: 16px; font-weight: 900; color: #7c3aed;">{{ data.summary.avg_opps_day }} / día</div>
-          </td>
-          <td style="padding: 12px 14px; text-align: center; font-size: 11px; color: #4338ca;">
-            Meta: 120 ll · 15 kp · 5 op
-          </td>
+        <tr style="background: #eef2ff; border-top: 1px solid #c7d2fe; font-weight: 900;">
+          <td style="padding: 12px 20px; color: #312e81;">PROMEDIO POR DÍA</td>
+          <td id="dailyFootAvgCalls" style="padding: 12px 20px; text-align: center; font-size: 15.5px; color: #312e81;">{{ data.summary.avg_calls_day }} / día</td>
+          <td id="dailyFootAvgKps" style="padding: 12px 20px; text-align: center; font-size: 15.5px; color: #059669;">{{ data.summary.avg_kps_day }} / día</td>
+          <td id="dailyFootAvgOpps" style="padding: 12px 20px; text-align: center; font-size: 15.5px; color: #7c3aed;">{{ data.summary.avg_opps_day }} / día</td>
         </tr>
       </tfoot>
     </table>
   </div>
 </div>
+{% endif %}
 
 <!-- SECCIÓN DE CONTROL DE JORNADA COMERCIAL (1RA Y ÚLTIMA LLAMADA MAÑANA Y TARDE) -->
 <div class="executive-panel" style="padding: 0; overflow: hidden; margin-bottom: 28px; border: 1px solid #bfdbfe; box-shadow: 0 4px 6px -1px rgba(2, 132, 199, 0.05);">
@@ -1524,48 +1359,28 @@
 <script>
 const DAILY_STATS_MAP = {
   team: {
-    label: 'Todo el Equipo ({{ data.commercials|length }} comerciales)',
-    footName: 'Todo el Equipo',
+    label: 'Todo el Equipo',
+    totCalls: '{{ data.summary.total_calls }}',
+    totKps: '{{ data.summary.total_all_kps }}',
+    totOpps: '{{ data.summary.total_opps }}',
     avgCalls: '{{ data.summary.avg_calls_day }}',
     avgKps: '{{ data.summary.avg_kps_day }}',
-    avgOpps: '{{ data.summary.avg_opps_day }}',
-    totCalls: '{{ data.summary.total_calls }}',
-    outIn: '{{ data.summary.total_out_calls }} Out / {{ data.summary.total_in_calls }} In',
-    dialTime: '{{ data.summary.gross_dial_time.human }}',
-    liveKp: '{{ data.summary.total_live_kps }}',
-    ekp: '{{ data.summary.total_ekp }}',
-    tkp: '{{ data.summary.total_tkp }}',
-    totKps: '{{ data.summary.total_all_kps }}',
-    eff: '{{ data.summary.team_effectiveness }}%',
-    totOpps: '{{ data.summary.total_opps }}',
-    oppsSP: '{{ data.summary.total_opps_sales }} S / {{ data.summary.total_opps_purchase }} P'
+    avgOpps: '{{ data.summary.avg_opps_day }}'
   },
   {% for comm in data.commercials %}
   {{ comm.id|tojson }}: {
     label: {{ comm.name|tojson }},
-    footName: {{ comm.name|tojson }},
+    totCalls: '{{ comm.calls_total }}',
+    totKps: '{{ comm.total_kps }}',
+    totOpps: '{{ comm.opps_total }}',
     avgCalls: '{{ comm.avg_calls_day }}',
     avgKps: '{{ comm.avg_kps_day }}',
-    avgOpps: '{{ comm.avg_opps_day }}',
-    totCalls: '{{ comm.calls_total }}',
-    outIn: '{{ comm.calls_out }} Out / {{ comm.calls_in }} In',
-    dialTime: '{{ comm.gross_dial_time.human }}',
-    liveKp: '{{ comm.live_kp }}',
-    ekp: '{{ comm.ekp }}',
-    tkp: '{{ comm.tkp }}',
-    totKps: '{{ comm.total_kps }}',
-    eff: '{{ comm.effectiveness }}%',
-    totOpps: '{{ comm.opps_total }}',
-    oppsSP: '{{ comm.opps_sales }} S / {{ comm.opps_purchase }} P'
+    avgOpps: '{{ comm.avg_opps_day }}'
   },
   {% endfor %}
 };
 
-let currentDailyFilterMode = 'team';
-
 function filterDailyCommercial(mode, btn) {
-  currentDailyFilterMode = mode;
-
   document.querySelectorAll('.daily-pill').forEach(function(p) {
     p.classList.remove('active');
     p.style.background = 'white';
@@ -1581,18 +1396,12 @@ function filterDailyCommercial(mode, btn) {
     btn.style.fontWeight = '700';
   }
 
-  var searchInput = document.getElementById('dailyBreakdownSearch');
-  if (searchInput) searchInput.value = '';
-
   var teamRows = document.querySelectorAll('.daily-team-row');
   var agentRows = document.querySelectorAll('.daily-breakdown-row');
 
   if (mode === 'team') {
     teamRows.forEach(function(r) { r.style.display = ''; });
     agentRows.forEach(function(r) { r.style.display = 'none'; });
-  } else if (mode === 'all') {
-    teamRows.forEach(function(r) { r.style.display = 'none'; });
-    agentRows.forEach(function(r) { r.style.display = ''; });
   } else {
     teamRows.forEach(function(r) { r.style.display = 'none'; });
     agentRows.forEach(function(r) {
@@ -1600,62 +1409,23 @@ function filterDailyCommercial(mode, btn) {
     });
   }
 
-  // Actualizar tarjetas de promedios y pie de tabla
   var stats = DAILY_STATS_MAP[mode] || DAILY_STATS_MAP.team;
   var setText = function(id, val) {
     var el = document.getElementById(id);
     if (el) el.textContent = val;
   };
-  setText('dailyActiveLabel', mode === 'all' ? 'Todos los Comerciales (Detalle Completo)' : stats.label);
-  setText('dailyCardAvgCalls', stats.avgCalls);
-  setText('dailyCardTotCalls', stats.totCalls);
-  setText('dailyCardAvgKps', stats.avgKps);
-  setText('dailyCardTotKps', stats.totKps);
-  setText('dailyCardAvgOpps', stats.avgOpps);
-  setText('dailyCardTotOpps', stats.totOpps);
-
-  setText('dailyFootName', stats.footName);
+  setText('dailyActiveLabel', stats.label);
   setText('dailyFootTotCalls', stats.totCalls);
-  setText('dailyFootOutIn', stats.outIn);
-  setText('dailyFootDialTime', stats.dialTime);
-  setText('dailyFootLiveKp', stats.liveKp);
-  var ekpTkpEl = document.getElementById('dailyFootEkpTkp');
-  if (ekpTkpEl) {
-    ekpTkpEl.innerHTML = '<span style="color: #7c3aed; font-weight: 700;">' + stats.ekp + ' EKP</span> | <span style="color: #d97706; font-weight: 700;">' + stats.tkp + ' TKP</span>';
-  }
   setText('dailyFootTotKps', stats.totKps);
-  setText('dailyFootEff', stats.eff);
   setText('dailyFootTotOpps', stats.totOpps);
-  setText('dailyFootOppsSP', stats.oppsSP);
   setText('dailyFootAvgCalls', stats.avgCalls + ' / día');
   setText('dailyFootAvgKps', stats.avgKps + ' / día');
   setText('dailyFootAvgOpps', stats.avgOpps + ' / día');
 
-  // Actualizar URL de exportacion CSV
   var csvBtn = document.getElementById('dailyCsvExportBtn');
   if (csvBtn) {
     var baseUrl = csvBtn.getAttribute('data-base-url');
-    if (mode !== 'team' && mode !== 'all') {
-      csvBtn.setAttribute('href', baseUrl + '&agent_id=' + encodeURIComponent(mode));
-    } else {
-      csvBtn.setAttribute('href', baseUrl);
-    }
-  }
-}
-
-function filterDailyBreakdownSearch() {
-  var term = (document.getElementById('dailyBreakdownSearch').value || '').toLowerCase().trim();
-  if (currentDailyFilterMode === 'team') {
-    document.querySelectorAll('.daily-team-row').forEach(function(row) {
-      var s = row.getAttribute('data-search') || '';
-      row.style.display = (!term || s.indexOf(term) !== -1) ? '' : 'none';
-    });
-  } else {
-    document.querySelectorAll('.daily-breakdown-row').forEach(function(row) {
-      var matchesAgent = (currentDailyFilterMode === 'all' || row.getAttribute('data-user-id') === currentDailyFilterMode);
-      var s = row.getAttribute('data-search') || '';
-      row.style.display = (matchesAgent && (!term || s.indexOf(term) !== -1)) ? '' : 'none';
-    });
+    csvBtn.setAttribute('href', mode !== 'team' ? (baseUrl + '&agent_id=' + encodeURIComponent(mode)) : baseUrl);
   }
 }
 
