@@ -1,6 +1,7 @@
 """Servicio para el Panel Comercial de Hernán (KPIs Diarios, KPs, Llamadas, Metas, Horarios y Pipelines).
 Procesa en tiempo real desde Close CRM todas las métricas de desempeño de los comerciales autorizados.
 """
+import json
 import os
 import requests
 import time
@@ -168,24 +169,83 @@ def clear_cache():
     global _DASHBOARD_CACHE, _DAY_CALLS_CACHE
     _DASHBOARD_CACHE.clear()
     _DAY_CALLS_CACHE.clear()
+    try:
+        with db.get_conn() as conn:
+            conn.execute("DELETE FROM dashboard_cache")
+    except Exception:
+        pass
+
+
+DEFAULT_EXCLUDED_DATES = [
+    {"date": "2026-12-08", "label": "Festivo - Inmaculada Concepcion"},
+]
+
+
+def get_excluded_dates():
+    """Retorna la lista ordenada de fechas no laborales / festivos excluidos de los promedios."""
+    raw = db.get_setting("commercial_excluded_dates", "")
+    if not raw:
+        try:
+            db.set_setting("commercial_excluded_dates", json.dumps(DEFAULT_EXCLUDED_DATES))
+        except Exception:
+            pass
+        return list(DEFAULT_EXCLUDED_DATES)
+    try:
+        items = json.loads(raw)
+        if isinstance(items, list):
+            clean = []
+            seen = set()
+            for it in items:
+                d_s = str(it.get("date") or "").strip()[:10]
+                if d_s and d_s not in seen:
+                    seen.add(d_s)
+                    clean.append({"date": d_s, "label": str(it.get("label") or "Festivo / No laboral").strip()})
+            clean.sort(key=lambda x: x["date"], reverse=True)
+            return clean
+    except Exception:
+        pass
+    return []
+
+
+def add_excluded_date(date_str, label=""):
+    """Agrega una fecha no laboral / festivo para excluirla de los promedios diarios."""
+    d_s = (date_str or "").strip()[:10]
+    datetime.strptime(d_s, "%Y-%m-%d")  # validar formato
+    lbl = (label or "").strip() or "Festivo / No laboral"
+    items = [it for it in get_excluded_dates() if it["date"] != d_s]
+    items.append({"date": d_s, "label": lbl})
+    items.sort(key=lambda x: x["date"], reverse=True)
+    db.set_setting("commercial_excluded_dates", json.dumps(items))
+    clear_cache()
+    return items
+
+
+def remove_excluded_date(date_str):
+    """Elimina una fecha de la lista de días excluidos de los promedios."""
+    d_s = (date_str or "").strip()[:10]
+    items = [it for it in get_excluded_dates() if it["date"] != d_s]
+    db.set_setting("commercial_excluded_dates", json.dumps(items))
+    clear_cache()
+    return items
 
 
 def _get_auth():
     return close_crm._get_auth()
 
 
-def calculate_business_days(start_date_str, end_date_str):
-    """Calcula la cantidad de días hábiles (lunes a viernes) entre dos fechas YYYY-MM-DD."""
+def calculate_business_days(start_date_str, end_date_str, excluded_dates_set=None):
+    """Calcula la cantidad de días hábiles (lunes a viernes, excluyendo festivos/fechas no laborales) entre dos fechas YYYY-MM-DD."""
     try:
         d_start = datetime.strptime(start_date_str, "%Y-%m-%d").date()
         d_end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
         if d_start > d_end:
             d_start, d_end = d_end, d_start
-        
+
+        excl = excluded_dates_set or set()
         days_count = 0
         cur = d_start
         while cur <= d_end:
-            if cur.weekday() < 5:  # 0=Monday ... 4=Friday
+            if cur.weekday() < 5 and cur.isoformat() not in excl:  # 0=Lun ... 4=Vie y no festivo
                 days_count += 1
             cur += timedelta(days=1)
         return max(1, days_count)
@@ -349,12 +409,12 @@ def _filter_dashboard_for_team(result, allowed_user_ids):
         "total_live_kp_verified": sum(1 for a in ai_calls if a.get("verdict") == "VERIFICADO"),
         "total_ekp_verified": sum(1 for a in ai_tags if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
         "total_tkp_verified": sum(1 for a in ai_tags if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
-        "avg_calls_day": round(tot_calls / max(1, base_summary.get("business_days", 1)), 1),
-        "avg_kps_day": round(tot_all_kps / max(1, base_summary.get("business_days", 1)), 1),
-        "avg_opps_day": round(sum(c.get("opps_total", 0) for c in commercials) / max(1, base_summary.get("business_days", 1)), 1),
-        "avg_calls_per_agent_day": round(tot_calls / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
-        "avg_kps_per_agent_day": round(tot_all_kps / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
-        "avg_opps_per_agent_day": round(sum(c.get("opps_total", 0) for c in commercials) / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
+        "avg_calls_day": round(sum(d.get("calls_total", 0) for c in commercials for d in c.get("daily_breakdown", []) if not d.get("is_excluded")) / max(1, base_summary.get("business_days", 1)), 1),
+        "avg_kps_day": round(sum(d.get("total_kps", 0) for c in commercials for d in c.get("daily_breakdown", []) if not d.get("is_excluded")) / max(1, base_summary.get("business_days", 1)), 1),
+        "avg_opps_day": round(sum(d.get("opps_total", 0) for c in commercials for d in c.get("daily_breakdown", []) if not d.get("is_excluded")) / max(1, base_summary.get("business_days", 1)), 1),
+        "avg_calls_per_agent_day": round(sum(d.get("calls_total", 0) for c in commercials for d in c.get("daily_breakdown", []) if not d.get("is_excluded")) / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
+        "avg_kps_per_agent_day": round(sum(d.get("total_kps", 0) for c in commercials for d in c.get("daily_breakdown", []) if not d.get("is_excluded")) / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
+        "avg_opps_per_agent_day": round(sum(d.get("opps_total", 0) for c in commercials for d in c.get("daily_breakdown", []) if not d.get("is_excluded")) / max(1, base_summary.get("business_days", 1) * max(1, len(commercials))), 1),
     })
 
     filtered_daily_breakdown = []
@@ -464,7 +524,7 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
     if not start_date:
         start_date = today.isoformat()
 
-    cache_key = f"comm_dash_v4_{start_date}_{end_date}"
+    cache_key = f"comm_dash_v5_{start_date}_{end_date}"
     now_ts = time.time()
     if not force_refresh:
         if cache_key in _DASHBOARD_CACHE:
@@ -496,7 +556,10 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         days_list.append(cur_d.strftime("%Y-%m-%d"))
         cur_d += timedelta(days=1)
 
-    business_days = calculate_business_days(start_date, end_date)
+    excluded_dates = get_excluded_dates()
+    excluded_map = {it["date"]: it["label"] for it in excluded_dates}
+    excluded_dates_set = set(excluded_map.keys())
+    business_days = calculate_business_days(start_date, end_date, excluded_dates_set=excluded_dates_set)
     period_target_calls = business_days * DAILY_GOAL_CALLS
     period_target_kps = business_days * DAILY_GOAL_TOTAL_KPS
     period_target_call_kps = business_days * DAILY_GOAL_CALL_KPS
@@ -1469,19 +1532,22 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         max_gap_min = max([g["gap_minutes"] for g in user_gaps], default=0)
         max_gap_human = f"{int(max_gap_min // 60)}h {int(max_gap_min % 60):02d}m" if max_gap_min >= 60 else f"{int(max_gap_min)} min" if max_gap_min > 0 else "-"
 
-        # Promedios diarios individuales
-        avg_calls_day = round(c_total / max(1, business_days), 1)
-        avg_kps_day = round(all_kps / max(1, business_days), 1)
-        avg_call_kps_day = round(live_kp / max(1, business_days), 1)
-        avg_opps_day = round(op_total / max(1, business_days), 1)
-
         # Desglose día a día para este comercial en el periodo
         user_daily_breakdown = []
+        work_calls_sum = 0
+        work_kps_sum = 0
+        work_live_kp_sum = 0
+        work_opps_sum = 0
         for day_s in days_list:
             try:
                 d_obj = datetime.strptime(day_s, "%Y-%m-%d").date()
             except Exception:
                 continue
+
+            is_weekend = d_obj.weekday() >= 5
+            is_holiday = day_s in excluded_dates_set
+            holiday_label = excluded_map.get(day_s, "")
+            is_excluded = is_weekend or is_holiday
 
             ucalls_day = user_day_calls_map.get((uid, day_s), [])
             c_out_d = sum(1 for _, c in ucalls_day if c.get("direction") == "outbound")
@@ -1499,6 +1565,16 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
             o_s_d = o_data_d["sales"]
             o_p_d = o_data_d["purchase"]
             o_tot_d = o_data_d["total"]
+
+            if not is_excluded:
+                work_calls_sum += c_tot_d
+                work_kps_sum += tot_kps_d
+                work_live_kp_sum += l_kp_d
+                work_opps_sum += o_tot_d
+
+            # Omitir fines de semana sin actividad para mantener la tabla diaria limpia
+            if is_weekend and c_tot_d == 0 and tot_kps_d == 0 and o_tot_d == 0:
+                continue
 
             eff_d = round(100.0 * l_kp_d / c_tot_d, 1) if c_tot_d else 0.0
 
@@ -1520,7 +1596,10 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                 "date_label": f"{short_days_es[d_obj.weekday()]} {d_obj.day}/{short_months_es[d_obj.month]}",
                 "weekday": full_days_es[d_obj.weekday()],
                 "weekday_short": short_days_es[d_obj.weekday()],
-                "is_weekend": d_obj.weekday() >= 5,
+                "is_weekend": is_weekend,
+                "is_holiday": is_holiday,
+                "holiday_label": holiday_label,
+                "is_excluded": is_excluded,
                 "calls_out": c_out_d,
                 "calls_in": c_in_d,
                 "calls_total": c_tot_d,
@@ -1546,6 +1625,12 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
                 "status_class": st_class,
                 "status_label": st_label,
             })
+
+        # Promedios diarios individuales (excluyendo sábados, domingos y festivos configurados)
+        avg_calls_day = round(work_calls_sum / max(1, business_days), 1)
+        avg_kps_day = round(work_kps_sum / max(1, business_days), 1)
+        avg_call_kps_day = round(work_live_kp_sum / max(1, business_days), 1)
+        avg_opps_day = round(work_opps_sum / max(1, business_days), 1)
 
         # Cumplimiento contra metas del periodo
         calls_pct = round(100.0 * c_total / period_target_calls, 1) if period_target_calls else 0.0
@@ -1708,6 +1793,17 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
 
     # Mantenemos el orden predeterminado estricto de COMMERCIAL_TEAM solicitado por Hernán
 
+    # Totales estrictamente en días hábiles (excluyendo sábados, domingos y festivos configurados)
+    work_tot_calls = sum(
+        d["calls_total"] for c in commercial_rows for d in c.get("daily_breakdown", []) if not d.get("is_excluded")
+    )
+    work_tot_kps = sum(
+        d["total_kps"] for c in commercial_rows for d in c.get("daily_breakdown", []) if not d.get("is_excluded")
+    )
+    work_tot_opps = sum(
+        d["opps_total"] for c in commercial_rows for d in c.get("daily_breakdown", []) if not d.get("is_excluded")
+    )
+
     team_summary = {
         "agents_count": len(commercial_rows),
         "business_days": business_days,
@@ -1744,13 +1840,13 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "total_live_kp_verified": sum(1 for a in ai_call_audits if a.get("verdict") == "VERIFICADO"),
         "total_ekp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "EKP" and a.get("verdict") == "VERIFICADO"),
         "total_tkp_verified": sum(1 for a in ai_tag_audits if a.get("type") == "TKP" and a.get("verdict") == "VERIFICADO"),
-        # Promedios diarios del equipo y por comercial
-        "avg_calls_day": round(tot_calls / max(1, business_days), 1),
-        "avg_kps_day": round(tot_all_kps / max(1, business_days), 1),
-        "avg_opps_day": round(tot_opps / max(1, business_days), 1),
-        "avg_calls_per_agent_day": round(tot_calls / max(1, business_days * max(1, len(commercial_rows))), 1),
-        "avg_kps_per_agent_day": round(tot_all_kps / max(1, business_days * max(1, len(commercial_rows))), 1),
-        "avg_opps_per_agent_day": round(tot_opps / max(1, business_days * max(1, len(commercial_rows))), 1),
+        # Promedios diarios del equipo y por comercial (excluyendo sábados, domingos y festivos)
+        "avg_calls_day": round(work_tot_calls / max(1, business_days), 1),
+        "avg_kps_day": round(work_tot_kps / max(1, business_days), 1),
+        "avg_opps_day": round(work_tot_opps / max(1, business_days), 1),
+        "avg_calls_per_agent_day": round(work_tot_calls / max(1, business_days * max(1, len(commercial_rows))), 1),
+        "avg_kps_per_agent_day": round(work_tot_kps / max(1, business_days * max(1, len(commercial_rows))), 1),
+        "avg_opps_per_agent_day": round(work_tot_opps / max(1, business_days * max(1, len(commercial_rows))), 1),
     }
 
     ai_summary = {
@@ -1774,6 +1870,8 @@ def get_commercial_dashboard_data(start_date=None, end_date=None, force_refresh=
         "start_date": start_date,
         "end_date": end_date,
         "business_days": business_days,
+        "excluded_dates": excluded_dates,
+        "excluded_in_period": [it for it in excluded_dates if start_date <= it["date"] <= end_date],
         "commercials": commercial_rows,
         "summary": team_summary,
         "tagged_records": notes_tags["records"],

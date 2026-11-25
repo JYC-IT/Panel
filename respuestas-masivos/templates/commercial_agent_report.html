@@ -209,10 +209,15 @@
       </thead>
       <tbody>
         {% for d in c.daily_breakdown %}
-        <tr style="border-bottom: 1px solid var(--border); {% if d.is_weekend %}background: #fbfbfb;{% endif %}">
+        <tr style="border-bottom: 1px solid var(--border); {% if d.is_excluded %}background: #f8fafc; opacity: 0.8;{% endif %}">
           <td style="padding: 10px 20px; white-space: nowrap;">
             <strong style="color: var(--text-main);">{{ d.date_label }}</strong>
             <span style="font-size: 11.5px; color: var(--text-muted); margin-left: 6px;">{{ d.weekday }}</span>
+            {% if d.is_holiday %}
+            <span class="badge" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-size: 10px; padding: 1px 6px; margin-left: 6px;" title="{{ d.holiday_label }}">Festivo · Excluido</span>
+            {% elif d.is_weekend %}
+            <span class="badge" style="background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; font-size: 10px; padding: 1px 6px; margin-left: 6px;">Fin de semana · Excluido</span>
+            {% endif %}
           </td>
           <td style="padding: 10px 20px; text-align: center;">
             <span style="font-weight: 800; font-size: 14.5px; color: var(--text-main);">{{ d.calls_total }}</span>

@@ -547,3 +547,28 @@ def register_commercial_routes(app):
             mimetype="text/csv; charset=utf-8",
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
+
+    @app.route("/commercial-dashboard/excluded-dates/add", methods=["POST"])
+    @auth.login_required
+    def add_commercial_excluded_date():
+        date_val = (request.form.get("excluded_date") or "").strip()
+        label_val = (request.form.get("excluded_label") or "").strip()
+        start_date = request.form.get("start_date") or date.today().isoformat()
+        end_date = request.form.get("end_date") or date.today().isoformat()
+        try:
+            commercial_dashboard.add_excluded_date(date_val, label_val)
+            flash(f"Fecha {date_val} excluida de los promedios diarios.", "ok")
+        except Exception:
+            flash("Fecha invalida. Selecciona una fecha valida en formato AAAA-MM-DD.", "err")
+        return redirect(url_for("commercial_dashboard_view", start_date=start_date, end_date=end_date))
+
+    @app.route("/commercial-dashboard/excluded-dates/remove", methods=["POST"])
+    @auth.login_required
+    def remove_commercial_excluded_date():
+        date_val = (request.form.get("excluded_date") or "").strip()
+        start_date = request.form.get("start_date") or date.today().isoformat()
+        end_date = request.form.get("end_date") or date.today().isoformat()
+        if date_val:
+            commercial_dashboard.remove_excluded_date(date_val)
+            flash(f"Fecha {date_val} removida de los dias excluidos.", "ok")
+        return redirect(url_for("commercial_dashboard_view", start_date=start_date, end_date=end_date))
